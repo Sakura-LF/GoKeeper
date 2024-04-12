@@ -8,11 +8,18 @@ import (
 
 // DB bitcask 存储引擎实现
 type DB struct {
-	options    Options
-	mu         *sync.RWMutex
-	activeFile *data.DataFile            // 当前活跃数据文件,可以用于写入
-	olderFiles map[uint32]*data.DataFile // 旧的数据文件,只能用于读
-	index      index.Index               // 内存索引
+	// 用户配置选项
+	options Options
+
+	// 当前活跃数据文件,可以用于写入
+	activeFile *data.DataFile
+
+	// 旧的数据文件,只能用于读
+	olderFiles map[uint32]*data.DataFile
+
+	// 内存索引
+	index index.Index
+	mu    *sync.RWMutex
 }
 
 // Put 写入key/value数据,key不能为空
