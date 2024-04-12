@@ -3,6 +3,12 @@ package GoKeeper
 import (
 	"GoKeeper/data"
 	"GoKeeper/index"
+	"errors"
+	"io"
+	"os"
+	"sort"
+	"strconv"
+	"strings"
 	"sync"
 )
 
@@ -17,9 +23,136 @@ type DB struct {
 	// 旧的数据文件,只能用于读
 	olderFiles map[uint32]*data.DataFile
 
+	// 文件id,在加载索引的时候用
+	fileids []int
+
 	// 内存索引
 	index index.Index
 	mu    *sync.RWMutex
+}
+
+func Open(options Options) (*DB, error) {
+	// 对用户传入的配置进行校验
+	if err := checkOptions(options); err != nil {
+		return nil, err
+	}
+
+	// 如果目录不存在,则创建
+	if _, err := os.Stat(options.DirPath); os.IsNotExist(err) {
+		if err = os.MkdirAll(options.DirPath, os.ModeDir); err != nil {
+			return nil, err
+		}
+	}
+
+	// 初始化 DB 实例结构体
+	db := &DB{
+		options:    options,
+		mu:         new(sync.RWMutex),
+		olderFiles: make(map[uint32]*data.DataFile),
+		index:      index.NewIndexer(options.IndexType),
+	}
+
+	// 加载数据文件
+	if err := db.loadDataFile(); err != nil {
+		return nil, err
+	}
+
+	// 从数据文件中加载索引
+	if err := db.loadIndexFromDataFiles(); err != nil {
+		return nil, err
+	}
+
+	return db, nil
+}
+
+func (db *DB) loadDataFile() error {
+	dirEntries, err := os.ReadDir(db.options.DirPath)
+	if err != nil {
+		return err
+	}
+
+	var fileIds []int
+	// 遍历目录中的所有文件,找到所有以 .data 结尾的文件
+	for _, entry := range dirEntries {
+		if strings.HasSuffix(entry.Name(), data.DataFileNameSuffix) {
+			splitNames := strings.Split(entry.Name(), ".")
+			fileId, err := strconv.Atoi(splitNames[0])
+			// 数据文件可能损坏
+			if err != nil {
+				return ErrDataDirectoryCorrupted
+			}
+			fileIds = append(fileIds, fileId)
+		}
+	}
+
+	// 对文件 id 进行排序,从小到大,一次加载
+	sort.Ints(fileIds)
+	db.fileids = fileIds
+
+	// 遍历每个文件id,打开对应的数据文件
+	for i, fid := range fileIds {
+		datafile, err := data.OpenDataFile(db.options.DirPath, uint32(fid))
+		if err != nil {
+			return err
+		}
+		if i == len(fileIds)-1 {
+			db.activeFile = datafile
+		} else {
+			db.olderFiles[uint32(fid)] = datafile
+		}
+	}
+	return nil
+}
+
+// 从数据文件中加载索引
+// 遍历文件中的所有记录,并更新到内存索引中
+func (db *DB) loadIndexFromDataFiles() error {
+	// 没有文件,说明数据库是空的
+	if len(db.fileids) == 0 {
+		return nil
+	}
+
+	// 遍历所有的文件id, 处理文件中的记录
+	for i, fid := range db.fileids {
+		var fileiId = uint32(fid)
+		var dataFile *data.DataFile
+		if fileiId == db.activeFile.FileID {
+			dataFile = db.activeFile
+		} else {
+			dataFile = db.olderFiles[fileiId]
+		}
+
+		var offset int64 = 0
+		for {
+			logRecord, size, err := dataFile.ReadLogRecord(offset)
+			if err != nil {
+				if errors.Is(err, io.EOF) {
+					break
+				}
+				return err
+			}
+
+			// 构造内存索引并保存
+			logRecordPos := &data.LogRecordPos{
+				Fid:    fileiId,
+				Offset: offset,
+			}
+			if logRecord.Type == data.LogRecordDeleted {
+				db.index.Delete(logRecord.Key)
+			} else {
+				db.index.Put(logRecord.Key, logRecordPos)
+			}
+
+			// 递增 offset,下一次从新的位置开始
+			offset += size
+		}
+
+		// 如果是当前活跃文件，更新这个文件的 Write0ff
+		if i == len(db.fileids)-1 {
+			db.activeFile.WriteOff = offset
+		}
+	}
+	return nil
 }
 
 // Put 写入key/value数据,key不能为空
@@ -80,7 +213,7 @@ func (db *DB) Get(key []byte) ([]byte, error) {
 	}
 
 	// 根据偏移量读取对应的数据
-	logRecord, err := dataFile.ReadLogRecord(logRecordPos.Offset)
+	logRecord, _, err := dataFile.ReadLogRecord(logRecordPos.Offset)
 	if err != nil {
 		return nil, err
 	}
@@ -154,5 +287,15 @@ func (db *DB) setActiveDateFile() error {
 		return err
 	}
 	db.activeFile = file
+	return nil
+}
+
+func checkOptions(options Options) error {
+	if options.DirPath == "" {
+		return errors.New("db dir path is empty")
+	}
+	if options.DataFileSize <= 0 {
+		return errors.New("database datafile must >= 0")
+	}
 	return nil
 }

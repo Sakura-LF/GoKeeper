@@ -19,6 +19,30 @@ type Index interface {
 	Delete(key []byte) bool
 }
 
+type IndexType = int8
+
+// 可以实现多种数据结构的索引
+const (
+	// Btree 索引
+	Btree IndexType = iota + 1
+
+	// ART 自适应基数树
+	ART
+)
+
+func NewIndexer(indexType IndexType) Index {
+	switch indexType {
+	case Btree:
+		NewBTree()
+	case ART:
+		// todo
+		return nil
+	default:
+		panic("unsupported index type")
+	}
+	return nil
+}
+
 // Item 因为BTree insert,get,delete需要Item,所以自己定义一个Item
 type Item struct {
 	key []byte

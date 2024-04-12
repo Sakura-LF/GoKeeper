@@ -9,4 +9,15 @@ type Options struct {
 
 	// 每次写入数据后是否要对数据进行安全的持久化
 	SyncWrites bool
+
+	// 索引类型(Btree,ART....)
+	IndexType IndexType
 }
+
+type IndexType = int8
+
+const (
+	Btree IndexType = iota + 1
+
+	ART
+)
