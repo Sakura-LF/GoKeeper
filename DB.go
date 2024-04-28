@@ -183,6 +183,36 @@ func (db *DB) Put(key []byte, value []byte) error {
 	return nil
 }
 
+// Delete 删除数据
+func (db *DB) Delete(key []byte) error {
+	// 检查key是否合法
+	if len(key) == 0 {
+		return ErrKeyIsEmpty
+	}
+
+	// 检查key是否存在
+	if pos := db.index.Get(key); pos == nil {
+		return ErrKeyNotFound
+	}
+
+	// 构造 LogRecord, 标识类型是被删除的
+	logRecord := &data.LogRecord{
+		Key:  key,
+		Type: data.LogRecordDeleted,
+	}
+	// 写入到数据文件中
+	_, err := db.appendLogRecord(logRecord)
+	if err != nil {
+		return nil
+	}
+
+	// 从内存索引中删除对应的 Key
+	ok := db.index.Delete(key)
+	if !ok {
+		return ErrIndexUpdateFailed
+	}
+}
+
 // Get 根据 key 读取数据
 func (db *DB) Get(key []byte) ([]byte, error) {
 	db.mu.Lock()
@@ -290,6 +320,7 @@ func (db *DB) setActiveDateFile() error {
 	return nil
 }
 
+// 检查DB的Options是否正确
 func checkOptions(options Options) error {
 	if options.DirPath == "" {
 		return errors.New("db dir path is empty")

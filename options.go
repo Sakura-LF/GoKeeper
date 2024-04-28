@@ -17,7 +17,9 @@ type Options struct {
 type IndexType = int8
 
 const (
+	// Btree 索引
 	Btree IndexType = iota + 1
 
+	// ART 自适应基数树索引
 	ART
 )
