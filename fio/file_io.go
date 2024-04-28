@@ -18,18 +18,18 @@ func NewFileIO(filename string) (*FileIo, error) {
 	return &FileIo{fd: file}, nil
 }
 
-func (f FileIo) Read(bytes []byte, i int64) (int, error) {
+func (f *FileIo) Read(bytes []byte, i int64) (int, error) {
 	return f.fd.ReadAt(bytes, i)
 }
 
-func (f FileIo) Write(bytes []byte) (int, error) {
+func (f *FileIo) Write(bytes []byte) (int, error) {
 	return f.fd.Write(bytes)
 }
 
-func (f FileIo) Sync() error {
+func (f *FileIo) Sync() error {
 	return f.fd.Sync()
 }
 
-func (f FileIo) Close() error {
+func (f *FileIo) Close() error {
 	return f.fd.Close()
 }

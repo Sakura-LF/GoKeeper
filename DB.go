@@ -211,6 +211,7 @@ func (db *DB) Delete(key []byte) error {
 	if !ok {
 		return ErrIndexUpdateFailed
 	}
+	return nil
 }
 
 // Get 根据 key 读取数据

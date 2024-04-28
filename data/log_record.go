@@ -1,5 +1,7 @@
 package data
 
+import "encoding/binary"
+
 type LogRecordType byte
 
 const (
@@ -7,12 +9,25 @@ const (
 	LogRecordDeleted
 )
 
+// 日志记录(Header)的结构:
+// crc type keySize valueSize
+// 4    1     5       5
+const maxLogRecordHeaderSize = binary.MaxVarintLen32*2 + 5
+
 // LogRecord 写入到数据文件的记录
 // 之所以叫做日志,是因为数据文件中的数据是追加写入的,类似日志的格式
 type LogRecord struct {
 	Key   []byte
 	Value []byte
 	Type  LogRecordType
+}
+
+// LogRecordHeader LogRecord 的头部信息
+type LogRecordHeader struct {
+	crc        uint32        // crc 校验值
+	recordType LogRecordType // LogRecord 的类型
+	keySize    uint32        // key 的长度
+	valueSize  uint32        // value 的长度
 }
 
 // LogRecordPos 数据内存的索引,描述数据在磁盘上的位置
@@ -24,4 +39,19 @@ type LogRecordPos struct {
 // EncodeLogRecord 对 LogRecord 进行编码,返回字节数组以及长度
 func EncodeLogRecord(record *LogRecord) ([]byte, int64) {
 	return nil, 0
+}
+
+// DecodeLogRecordHead 对 LogRecord 进行解码，返回
+func DecodeLogRecordHead(buf []byte) (*LogRecordHeader, int64) {
+	return &LogRecordHeader{
+		crc:        0,
+		recordType: 0,
+		keySize:    0,
+		valueSize:  0,
+	}, 0
+}
+
+// 获取LogRecordCRC
+func getLogRecordCRC(lr *LogRecord, header []byte) uint32 {
+	return 0
 }

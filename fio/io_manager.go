@@ -14,3 +14,7 @@ type IOManager interface {
 	// Close 关闭文件
 	Close() error
 }
+
+func NewIOManager(filename string) (IOManager, error) {
+	return NewFileIO(filename)
+}
