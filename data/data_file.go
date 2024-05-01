@@ -2,8 +2,14 @@ package data
 
 import (
 	"GoKeeper/fio"
+	"errors"
 	"fmt"
+	"hash/crc32"
 	"io"
+)
+
+var (
+	ErrInvalidCRC = errors.New("invalid crc")
 )
 
 const DataFileNameSuffix = ".data"
@@ -32,13 +38,25 @@ func OpenDataFile(dirPath string, fileId uint32) (*DataFile, error) {
 	}, err
 }
 
+// ReadLogRecord 读取日志记录
+// 返回日志记录,日志记录长度,error
 func (df *DataFile) ReadLogRecord(offset int64) (*LogRecord, int64, error) {
-	// 读取 Header 信息
-	headerBuf, err := df.readNBytes(maxLogRecordHeaderSize, offset)
+	// 获取文件大小
+	fileSize, err := df.IoManager.Size()
 	if err != nil {
 		return nil, 0, err
 	}
-	// 对Head进行解码:
+	var headerBytes int64 = maxLogRecordHeaderSize
+	if offset+maxLogRecordHeaderSize > fileSize {
+		headerBytes = fileSize - offset
+	}
+
+	// 读取 Header 信息
+	headerBuf, err := df.readNBytes(headerBytes, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	// 对 Head 进行解码:
 	// 返回解码后的 Header 和 HeaderSize
 	header, headerSize := DecodeLogRecordHead(headerBuf)
 	// 这两个条件标识读取到了文件末尾
@@ -67,15 +85,29 @@ func (df *DataFile) ReadLogRecord(offset int64) (*LogRecord, int64, error) {
 		logRecord.Value = kvbuf[keySize:]
 	}
 
-	return nil, 0, nil
+	// 校验数据的有效性
+	crc := getLogRecordCRC(logRecord, headerBuf[crc32.Size:headerSize])
+	if crc != header.crc {
+		return nil, 0, ErrInvalidCRC
+	}
+
+	return logRecord, recordSize, nil
 }
 
 func (df *DataFile) Write(buf []byte) error {
+	_, err := df.IoManager.Write(buf)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
 func (df *DataFile) Sync() error {
-	return nil
+	return df.IoManager.Sync()
+}
+
+func (df *DataFile) Close() error {
+	return df.IoManager.Close()
 }
 
 func (df *DataFile) readNBytes(n int64, offset int64) ([]byte, error) {

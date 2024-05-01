@@ -13,6 +13,9 @@ type IOManager interface {
 
 	// Close 关闭文件
 	Close() error
+
+	// Size 获取文件Size
+	Size() (int64, error)
 }
 
 func NewIOManager(filename string) (IOManager, error) {
