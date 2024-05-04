@@ -1,6 +1,9 @@
 package data
 
-import "encoding/binary"
+import (
+	"encoding/binary"
+	"hash/crc32"
+)
 
 type LogRecordType byte
 
@@ -37,8 +40,39 @@ type LogRecordPos struct {
 }
 
 // EncodeLogRecord 对 LogRecord 进行编码,返回字节数组以及长度
-func EncodeLogRecord(record *LogRecord) ([]byte, int64) {
-	return nil, 0
+// crc校验值  type     keySize,     valueSize     key     value
+//
+//	4        1     变长(最大5)    变长(最大5)    变长       变长
+func EncodeLogRecord(logRecord *LogRecord) ([]byte, int64) {
+	header := make([]byte, maxLogRecordHeaderSize)
+
+	// 第五个直接存储 Type
+	header[4] = byte(logRecord.Type)
+	var index = 5
+
+	// 之后存储 key 和 value 的长度信息
+	index += binary.PutVarint(header[index:], int64(len(logRecord.Key)))
+	index += binary.PutVarint(header[index:], int64(len(logRecord.Value)))
+
+	// 计算logRecord的长度
+	var size = index + len(logRecord.Key) + len(logRecord.Value)
+
+	// 根据长度创建一个byte切片
+	resultBytes := make([]byte, size)
+
+	// 将 header 部分拷贝过来
+	copy(resultBytes[:index], header[:index])
+	// key 和 value 也拷贝过来
+	copy(resultBytes[index:], logRecord.Key)
+	copy(resultBytes[index+len(logRecord.Key):], logRecord.Value)
+
+	// 对整个 LogRecord 的数据就行crc校验
+	// 从索引 4 开始
+	// 0 1 2 3 表示crc校验的知
+	crc := crc32.ChecksumIEEE(resultBytes[4:])
+	binary.LittleEndian.PutUint32(resultBytes, crc)
+
+	return resultBytes, int64(size)
 }
 
 // DecodeLogRecordHead 对 LogRecord 进行解码，返回
