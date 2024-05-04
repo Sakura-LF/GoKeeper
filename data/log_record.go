@@ -45,12 +45,15 @@ type LogRecordPos struct {
 //	4        1     变长(最大5)    变长(最大5)    变长       变长
 func EncodeLogRecord(logRecord *LogRecord) ([]byte, int64) {
 	header := make([]byte, maxLogRecordHeaderSize)
+	//header := make([]byte, maxLogRecordHeaderSize+len(logRecord.Key)+len(logRecord.Value))
 
-	// 第五个直接存储 Type
+	// 因为crc部分要包含后面的一切信息,所以最后进行crc校验
+	// 第五个存储 Type
 	header[4] = byte(logRecord.Type)
 	var index = 5
 
 	// 之后存储 key 和 value 的长度信息
+	// PutVarint 返回写入的字节数量
 	index += binary.PutVarint(header[index:], int64(len(logRecord.Key)))
 	index += binary.PutVarint(header[index:], int64(len(logRecord.Value)))
 
@@ -75,7 +78,7 @@ func EncodeLogRecord(logRecord *LogRecord) ([]byte, int64) {
 	return resultBytes, int64(size)
 }
 
-// DecodeLogRecordHead 对 LogRecord 进行解码，返回
+// DecodeLogRecordHead 对 LogRecord 进行解码，返回 Header 和 size
 func DecodeLogRecordHead(buf []byte) (*LogRecordHeader, int64) {
 	return &LogRecordHeader{
 		crc:        0,
