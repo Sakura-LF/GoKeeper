@@ -7,69 +7,148 @@ import (
 )
 
 func TestBTree_Put(t *testing.T) {
-	bt := NewBTree()
 
-	// key = nil
-	key1 := bt.Put(nil, &data.LogRecordPos{
-		Fid:    1,
-		Offset: 114514,
-	})
-	assert.True(t, key1)
-
-	// key == word
-	key2 := bt.Put([]byte("S"), &data.LogRecordPos{
-		Fid:    2,
-		Offset: 2000,
-	})
-	assert.True(t, key2)
+	type args struct {
+		key []byte
+		pos *data.LogRecordPos
+	}
+	tests := []struct {
+		name   string
+		fields *BTree
+		args   args
+		want   bool
+	}{
+		{
+			name:   "Put: key=nil",
+			fields: NewBTree(),
+			args: args{
+				key: nil,
+				pos: &data.LogRecordPos{
+					Fid:    1,
+					Offset: 114514,
+				},
+			},
+			want: true,
+		},
+		{
+			name:   "Put: key=Sakura",
+			fields: NewBTree(),
+			args: args{
+				key: []byte("Sakura"),
+				pos: &data.LogRecordPos{
+					Fid:    1,
+					Offset: 114514,
+				},
+			},
+			want: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			bt := &BTree{
+				tree: tt.fields.tree,
+			}
+			assert.Equalf(t, tt.want, bt.Put(tt.args.key, tt.args.pos), "Put(%s, %v)", tt.args.key, tt.args.pos)
+		})
+	}
 }
 
 func TestBTree_Get(t *testing.T) {
+	// 初始化 BTree
 	bt := NewBTree()
-
-	// key = nil
-	key1 := bt.Put(nil, &data.LogRecordPos{
+	bt.Put([]byte("FF14"), &data.LogRecordPos{
 		Fid:    1,
-		Offset: 114514,
+		Offset: 1,
 	})
-	assert.True(t, key1)
+	// 测试参数
+	type args struct {
+		key []byte
+	}
+	// 参数用例
+	tests := []struct {
+		name string
+		args args
+		want *data.LogRecordPos
+	}{
+		// key 为 nil, 不存在
+		{
+			name: "Get: key = nil",
+			args: args{
+				key: nil,
+			},
+			want: nil,
+		},
+		// key 为 Sakura, 不存在
+		{
+			name: "Get: key = Sakura",
+			args: args{
+				key: []byte("Sakura"),
+			},
+			want: nil,
+		},
+		// key 为 FF14, 存在
+		{
+			name: "Get: key = FF14",
+			args: args{
+				key: []byte("FF14"),
+			},
+			want: &data.LogRecordPos{Fid: 1, Offset: 1},
+		},
+	}
 
-	pos1 := bt.Get(nil)
-	assert.Equal(t, uint32(1), pos1.Fid)
-	assert.Equal(t, int64(114514), pos1.Offset)
-
-	// key == word
-	key2 := bt.Put([]byte("S"), &data.LogRecordPos{
-		Fid:    2,
-		Offset: 2000,
-	})
-	assert.True(t, key2)
-
-	pos2 := bt.Get([]byte("S"))
-	assert.Equal(t, uint32(2), pos2.Fid)
-	assert.Equal(t, int64(2000), pos2.Offset)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equalf(t, tt.want, bt.Get(tt.args.key), "Get(%s, %v)", tt.args.key, tt.want)
+		})
+	}
 }
 
 func TestBTree_Delete(t *testing.T) {
+	// 初始化 BTree
 	bt := NewBTree()
-
-	// key = nil
-	key1 := bt.Put(nil, &data.LogRecordPos{
+	bt.Put([]byte("FF14"), &data.LogRecordPos{
 		Fid:    1,
-		Offset: 114514,
+		Offset: 1,
 	})
-	assert.True(t, key1)
+	// 测试参数
+	type args struct {
+		key []byte
+	}
+	// 参数用例
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		// key 为 nil, 不存在
+		{
+			name: "Delete: key = nil",
+			args: args{
+				key: nil,
+			},
+			want: false,
+		},
+		// key 为 Sakura, 不存在
+		{
+			name: "Delete: key = Sakura",
+			args: args{
+				key: []byte("Sakura"),
+			},
+			want: false,
+		},
+		// key 为 FF14, 存在
+		{
+			name: "Delete: key = FF14",
+			args: args{
+				key: []byte("FF14"),
+			},
+			want: true,
+		},
+	}
 
-	del1 := bt.Delete(nil)
-	assert.True(t, del1)
-
-	// key == word
-	key2 := bt.Put([]byte("S"), &data.LogRecordPos{
-		Fid:    2,
-		Offset: 2000,
-	})
-	assert.True(t, key2)
-
-	del2 := bt.Delete([]byte("S"))
-	assert.True(t, del2)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equalf(t, tt.want, bt.Delete(tt.args.key), "Get(%s, %v)", tt.args.key, tt.want)
+		})
+	}
 }

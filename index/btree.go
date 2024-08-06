@@ -10,7 +10,7 @@ import (
 type BTree struct {
 	tree *btree.BTree
 	// 因为BTree 写不是并发安全的,读是并发安全的
-	mu sync.Mutex
+	lock sync.Mutex
 }
 
 func NewBTree() *BTree {
@@ -26,8 +26,8 @@ func (bt *BTree) Put(key []byte, pos *data.LogRecordPos) bool {
 		key: key,
 		pos: pos,
 	}
-	bt.mu.Lock()
-	defer bt.mu.Unlock()
+	bt.lock.Lock()
+	defer bt.lock.Unlock()
 	bt.tree.ReplaceOrInsert(it)
 	return true
 }
@@ -41,10 +41,11 @@ func (bt *BTree) Get(key []byte) *data.LogRecordPos {
 	}
 }
 
+// Delete 删除修改的代码
 func (bt *BTree) Delete(key []byte) bool {
 	it := &Item{key: key}
-	bt.mu.Lock()
-	defer bt.mu.Unlock()
+	bt.lock.Lock()
+	defer bt.lock.Unlock()
 	if item := bt.tree.Delete(it); item == nil {
 		return false
 	}
