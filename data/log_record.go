@@ -9,7 +9,9 @@ import (
 type LogRecordType byte
 
 const (
+	// LogRecordNormal 表示普通状态
 	LogRecordNormal LogRecordType = iota
+	// LogRecordDeleted 表示删除状态
 	LogRecordDeleted
 )
 

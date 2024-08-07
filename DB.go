@@ -31,6 +31,11 @@ type DB struct {
 	mu    *sync.RWMutex
 }
 
+// Open 启动数据库
+// 流程:
+// 1. 校验数据库配置
+// 2. 加载数据目录中的文件
+// 3. 遍历数据文件中的内容构建内存索引
 func Open(options Options) (*DB, error) {
 	// 对用户传入的配置进行校验
 	if err := checkOptions(options); err != nil {
@@ -156,6 +161,12 @@ func (db *DB) loadIndexFromDataFiles() error {
 }
 
 // Put 写入key/value数据,key不能为空
+// 流程:
+//  1. 首先判断 key 是否有效
+//     1.1 如为空,返回自定义错误
+//  2. 构造日志记录结构体 LogRecord
+//  3. 将日志记录追加写入到当前文件中 appendLogRecord(LogRecord)
+//  4. 更新内存索引(向内存索引执行Put)
 func (db *DB) Put(key []byte, value []byte) error {
 	// 判断key 是否有效
 	if len(key) == 0 {
@@ -180,37 +191,6 @@ func (db *DB) Put(key []byte, value []byte) error {
 		return ErrIndexUpdateFailed
 	}
 
-	return nil
-}
-
-// Delete 删除数据
-func (db *DB) Delete(key []byte) error {
-	// 检查key是否合法
-	if len(key) == 0 {
-		return ErrKeyIsEmpty
-	}
-
-	// 检查key是否存在
-	if pos := db.index.Get(key); pos == nil {
-		return ErrKeyNotFound
-	}
-
-	// 构造 LogRecord, 标识类型是被删除的
-	logRecord := &data.LogRecord{
-		Key:  key,
-		Type: data.LogRecordDeleted,
-	}
-	// 写入到数据文件中
-	_, err := db.appendLogRecord(logRecord)
-	if err != nil {
-		return nil
-	}
-
-	// 从内存索引中删除对应的 Key
-	ok := db.index.Delete(key)
-	if !ok {
-		return ErrIndexUpdateFailed
-	}
 	return nil
 }
 
@@ -256,7 +236,47 @@ func (db *DB) Get(key []byte) ([]byte, error) {
 	return logRecord.Value, nil
 }
 
-// 追加写数据到活跃文件中
+// Delete 删除数据
+func (db *DB) Delete(key []byte) error {
+	// 检查key是否合法
+	if len(key) == 0 {
+		return ErrKeyIsEmpty
+	}
+
+	// 检查key是否存在
+	if pos := db.index.Get(key); pos == nil {
+		return ErrKeyNotFound
+	}
+
+	// 构造 LogRecord, 标识类型是被删除的
+	logRecord := &data.LogRecord{
+		Key:  key,
+		Type: data.LogRecordDeleted,
+	}
+	// 写入到数据文件中
+	_, err := db.appendLogRecord(logRecord)
+	if err != nil {
+		return nil
+	}
+
+	// 从内存索引中删除对应的 Key
+	ok := db.index.Delete(key)
+	if !ok {
+		return ErrIndexUpdateFailed
+	}
+	return nil
+}
+
+// appendLogRecord 追加写数据到活跃文件中
+// 流程:
+//  1. 判断数据库活跃文件是否为空(数据库刚启动)
+//     1.1 若为空初始化活跃文件 initActiveFile
+//  2. 将要写入的数据进行编码
+//     2.1 编码:将结构体编码为一串字节数组
+//  3. 判断活跃文件+编码完成的长度是否大于数据库设定的存储阈值
+//     2.1 若大于,保存活跃文件,然后打开新的活跃文件
+//  4. 向活跃文件中写入内容 Write()
+//  5. 返回内存索引
 func (db *DB) appendLogRecord(logRecord *data.LogRecord) (*data.LogRecordPos, error) {
 	db.mu.Lock()
 	defer db.mu.Unlock()
@@ -264,12 +284,14 @@ func (db *DB) appendLogRecord(logRecord *data.LogRecord) (*data.LogRecordPos, er
 	// 判断当前活跃数据文件是否存在,因为数据库在没有写入的时候是没有文件生成的
 	// 活跃文件为空则初始化数据文件
 	if db.activeFile == nil {
-		if err := db.setActiveDateFile(); err != nil {
+		if err := db.setActiveDataFile(); err != nil {
 			return nil, err
 		}
 	}
+
 	// 写入数据编码
 	encodeRecord, size := data.EncodeLogRecord(logRecord)
+
 	// 如果写入数据已经到达了活跃文件的阈值,则关闭活跃文件,并打开新文件
 	if db.activeFile.WriteOff+size > db.options.DataFileSize {
 		// 先持久化数据文件,保证已有的数据持久化到磁盘当中
@@ -281,7 +303,7 @@ func (db *DB) appendLogRecord(logRecord *data.LogRecord) (*data.LogRecordPos, er
 		db.olderFiles[db.activeFile.FileID] = db.activeFile
 
 		// 打开新的数据文件
-		if err := db.setActiveDateFile(); err != nil {
+		if err := db.setActiveDataFile(); err != nil {
 			return nil, err
 		}
 	}
@@ -291,12 +313,13 @@ func (db *DB) appendLogRecord(logRecord *data.LogRecord) (*data.LogRecordPos, er
 		return nil, err
 	}
 
-	// 根据用户配置决定是否持久化
+	// 根据用户配置决定是否每次写入持久化
 	if db.options.SyncWrites {
 		if err := db.activeFile.Sync(); err != nil {
 			return nil, err
 		}
 	}
+
 	// 构造内存索引信息
 	pos := &data.LogRecordPos{
 		Fid:    db.activeFile.FileID,
@@ -305,14 +328,16 @@ func (db *DB) appendLogRecord(logRecord *data.LogRecord) (*data.LogRecordPos, er
 	return pos, nil
 }
 
-// 设置当前活跃文件
+// setActiveDataFile 设置当前活跃文件
 // 在访问此方法前必须持有互斥锁
-func (db *DB) setActiveDateFile() error {
+func (db *DB) setActiveDataFile() error {
 	var initialFileId uint32 = 0
 	if db.activeFile != nil {
+		// 活跃文件的 id 为数据库目前的活跃文件 id + 1
 		initialFileId = db.activeFile.FileID + 1
 	}
 	// 打开最新的数据文件
+	// 传入数据库配置中的路径,已经刚才初始化好的文件id
 	file, err := data.OpenDataFile(db.options.DirPath, initialFileId)
 	if err != nil {
 		return err
@@ -321,13 +346,13 @@ func (db *DB) setActiveDateFile() error {
 	return nil
 }
 
-// 检查DB的Options是否正确
+// checkOptions 检查DB的Options是否正确
 func checkOptions(options Options) error {
 	if options.DirPath == "" {
 		return errors.New("db dir path is empty")
 	}
 	if options.DataFileSize <= 0 {
-		return errors.New("database datafile must >= 0")
+		return errors.New("database datafileSize must >= 0")
 	}
 	return nil
 }

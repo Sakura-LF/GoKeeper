@@ -12,3 +12,15 @@ var (
 	ErrDataCountDeleted       = errors.New("data has deleted")
 	ErrDataDirectoryCorrupted = errors.New("the database directory maybe corrupted")
 )
+
+//type Error interface {
+//	error
+//}
+//
+//type OptionErr struct {
+//	DirPath string
+//}
+//
+//func (e *OptionErr) Error() string {
+//
+//}
