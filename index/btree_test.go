@@ -2,16 +2,24 @@ package index
 
 import (
 	"GoKeeper/data"
+	"bytes"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestBTree_Put(t *testing.T) {
-
+	// 初始化 BTree
+	bt := NewBTree()
+	bt.Put([]byte("FF14"), &data.LogRecordPos{
+		Fid:    1,
+		Offset: 1,
+	})
+	// 测试参数
 	type args struct {
 		key []byte
 		pos *data.LogRecordPos
 	}
+	// 测试用例
 	tests := []struct {
 		name   string
 		fields *BTree
@@ -19,7 +27,7 @@ func TestBTree_Put(t *testing.T) {
 		want   bool
 	}{
 		{
-			name:   "Put: key=nil",
+			name:   "Key=nil",
 			fields: NewBTree(),
 			args: args{
 				key: nil,
@@ -31,7 +39,7 @@ func TestBTree_Put(t *testing.T) {
 			want: true,
 		},
 		{
-			name:   "Put: key=Sakura",
+			name:   "Key=Sakura",
 			fields: NewBTree(),
 			args: args{
 				key: []byte("Sakura"),
@@ -42,13 +50,30 @@ func TestBTree_Put(t *testing.T) {
 			},
 			want: true,
 		},
+		// 对已经存在的key进行put
+		{
+			name:   "Key=FF14",
+			fields: NewBTree(),
+			args: args{
+				key: []byte("FF14"),
+				pos: &data.LogRecordPos{
+					Fid:    1,
+					Offset: 114514,
+				},
+			},
+			want: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			bt := &BTree{
-				tree: tt.fields.tree,
+			if bytes.Equal(tt.args.key, []byte("FF14")) {
+				bt.Put(tt.args.key, tt.args.pos)
+				logRecordPos := bt.Get(tt.args.key)
+				assert.Equalf(t, tt.args.pos, logRecordPos, "Put(%s, %v),Expect(%v),Actual(%v)", tt.args.key, tt.args.pos, tt.want, logRecordPos)
+				return
 			}
-			assert.Equalf(t, tt.want, bt.Put(tt.args.key, tt.args.pos), "Put(%s, %v)", tt.args.key, tt.args.pos)
+			put := bt.Put(tt.args.key, tt.args.pos)
+			assert.Equalf(t, tt.want, put, "Put(%s, %v),Expect(%v),Actual(%v)", tt.args.key, tt.args.pos, tt.want, put)
 		})
 	}
 }
@@ -72,7 +97,7 @@ func TestBTree_Get(t *testing.T) {
 	}{
 		// key 为 nil, 不存在
 		{
-			name: "Get: key = nil",
+			name: "Key=nil",
 			args: args{
 				key: nil,
 			},
@@ -80,7 +105,7 @@ func TestBTree_Get(t *testing.T) {
 		},
 		// key 为 Sakura, 不存在
 		{
-			name: "Get: key = Sakura",
+			name: "Key=Sakura",
 			args: args{
 				key: []byte("Sakura"),
 			},
@@ -88,7 +113,7 @@ func TestBTree_Get(t *testing.T) {
 		},
 		// key 为 FF14, 存在
 		{
-			name: "Get: key = FF14",
+			name: "Key=FF14",
 			args: args{
 				key: []byte("FF14"),
 			},
@@ -98,7 +123,8 @@ func TestBTree_Get(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equalf(t, tt.want, bt.Get(tt.args.key), "Get(%s, %v)", tt.args.key, tt.want)
+			logRecordPos := bt.Get(tt.args.key)
+			assert.Equalf(t, tt.want, logRecordPos, "Get(%s),Expect:(%v),Actual:(%v)", tt.args.key, tt.want, logRecordPos)
 		})
 	}
 }
@@ -122,7 +148,7 @@ func TestBTree_Delete(t *testing.T) {
 	}{
 		// key 为 nil, 不存在
 		{
-			name: "Delete: key = nil",
+			name: "Key=nil",
 			args: args{
 				key: nil,
 			},
@@ -130,7 +156,7 @@ func TestBTree_Delete(t *testing.T) {
 		},
 		// key 为 Sakura, 不存在
 		{
-			name: "Delete: key = Sakura",
+			name: "Key=Sakura",
 			args: args{
 				key: []byte("Sakura"),
 			},
@@ -138,7 +164,7 @@ func TestBTree_Delete(t *testing.T) {
 		},
 		// key 为 FF14, 存在
 		{
-			name: "Delete: key = FF14",
+			name: "Key=FF14",
 			args: args{
 				key: []byte("FF14"),
 			},
@@ -146,9 +172,11 @@ func TestBTree_Delete(t *testing.T) {
 		},
 	}
 
+	// 遍历测试用例,进行测试
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equalf(t, tt.want, bt.Delete(tt.args.key), "Get(%s, %v)", tt.args.key, tt.want)
+			success := bt.Delete(tt.args.key)
+			assert.Equalf(t, tt.want, success, "Delete(%s),Expect:(%v),Actual:(%v)", tt.args.key, tt.want, success)
 		})
 	}
 }
