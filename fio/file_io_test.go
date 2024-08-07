@@ -7,35 +7,6 @@ import (
 	"testing"
 )
 
-// 在测试结束后删除文件
-func RemoveFile(filename string) {
-	// RemoveAll 删除这个路径下的所有文件
-	// Remove 删除单个文件
-	if err := os.RemoveAll(filename); err != nil {
-		panic(err)
-	}
-}
-
-func TestFileIo_Sync(t *testing.T) {
-	filePath := filepath.Join("../tmp", "Test.data")
-	file, err := NewFileIO(filePath)
-	defer RemoveFile(filePath)
-	defer file.Close()
-
-	err = file.Sync()
-	assert.Nil(t, err)
-}
-
-func TestFileIo_Close(t *testing.T) {
-
-	filePath := filepath.Join("../tmp", "Test.data")
-	file, err := NewFileIO(filePath)
-	defer RemoveFile(filePath)
-
-	err = file.Close()
-	assert.Nil(t, err)
-}
-
 func TestNewFileIO(t *testing.T) {
 	type args struct {
 		filename string
@@ -142,4 +113,33 @@ func TestFileIo_Read1(t *testing.T) {
 			t.Log(string(tt.args.bytes))
 		})
 	}
+}
+
+// 在测试结束后删除文件
+func RemoveFile(filename string) {
+	// RemoveAll 删除这个路径下的所有文件
+	// Remove 删除单个文件
+	if err := os.RemoveAll(filename); err != nil {
+		panic(err)
+	}
+}
+
+func TestFileIo_Sync(t *testing.T) {
+	filePath := filepath.Join("../tmp", "Test.data")
+	file, err := NewFileIO(filePath)
+	defer RemoveFile(filePath)
+	defer file.Close()
+
+	err = file.Sync()
+	assert.Nil(t, err)
+}
+
+func TestFileIo_Close(t *testing.T) {
+
+	filePath := filepath.Join("../tmp", "Test.data")
+	file, err := NewFileIO(filePath)
+	defer RemoveFile(filePath)
+
+	err = file.Close()
+	assert.Nil(t, err)
 }
