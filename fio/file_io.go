@@ -4,14 +4,18 @@ import (
 	"os"
 )
 
-// FileIo 对标准文件系统的封装
+// FileIo 实现io_manager
+// 其实就是对标准文件系统的封装
 type FileIo struct {
 	fd *os.File
 }
 
 // NewFileIO 初始化标准文件IO
 func NewFileIO(filename string) (*FileIo, error) {
-	file, err := os.OpenFile(filename, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0644)
+	file, err := os.OpenFile(filename,
+		os.O_CREATE|os.O_APPEND|os.O_RDWR,
+		DataFilePerm,
+	)
 	if err != nil {
 		return nil, err
 	}

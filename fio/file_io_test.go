@@ -16,60 +16,6 @@ func RemoveFile(filename string) {
 	}
 }
 
-func TestNewFileIO(t *testing.T) {
-	filePath := filepath.Join("../tmp", "Test.data")
-	file, err := NewFileIO(filePath)
-	defer RemoveFile(filePath)
-	defer file.Close()
-
-	assert.Nil(t, err)
-	assert.NotNil(t, file)
-}
-
-func TestFileIo_Write(t *testing.T) {
-	filePath := filepath.Join("../tmp", "Test.data")
-	file, err := NewFileIO(filePath)
-	defer RemoveFile(filePath)
-	defer file.Close()
-
-	assert.Nil(t, err)
-	assert.NotNil(t, file)
-
-	// 写文件
-	n, err := file.Write([]byte(""))
-	assert.Equal(t, 0, n)
-	assert.Nil(t, err)
-
-	n, err = file.Write([]byte("Sakura"))
-	assert.Equal(t, 6, n)
-	assert.Nil(t, err)
-}
-
-func TestFileIo_Read(t *testing.T) {
-	filePath := filepath.Join("../tmp", "Test.data")
-	file, err := NewFileIO(filePath)
-	defer RemoveFile(filePath)
-	defer file.Close()
-
-	assert.Nil(t, err)
-	assert.NotNil(t, file)
-
-	// 写文件
-	n, err := file.Write([]byte("LF"))
-	assert.Equal(t, 2, n)
-	assert.Nil(t, err)
-
-	n, err = file.Write([]byte("Sakura"))
-	assert.Equal(t, 6, n)
-	assert.Nil(t, err)
-
-	// 读文件
-	b1 := make([]byte, 2)
-	read, err := file.Read(b1, 0)
-	assert.Equal(t, 2, read)
-	assert.Equal(t, []byte("LF"), b1)
-}
-
 func TestFileIo_Sync(t *testing.T) {
 	filePath := filepath.Join("../tmp", "Test.data")
 	file, err := NewFileIO(filePath)
@@ -88,4 +34,112 @@ func TestFileIo_Close(t *testing.T) {
 
 	err = file.Close()
 	assert.Nil(t, err)
+}
+
+func TestNewFileIO(t *testing.T) {
+	type args struct {
+		filename string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    *FileIo
+		wantErr assert.ErrorAssertionFunc
+	}{
+		{name: "sakura.data", args: args{filename: "../testFile/sakura.data"}, want: &FileIo{}},
+		{name: "test.data", args: args{filename: "../testFile/test.data"}, want: &FileIo{}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			io, err := NewFileIO(tt.args.filename)
+			assert.Nil(t, err)
+			assert.NotNil(t, io)
+		})
+	}
+}
+
+func TestFileIo_Write(t *testing.T) {
+	fileIo, _ := NewFileIO("../testFile/sakura.data")
+	type args struct {
+		bytes []byte
+	}
+	tests := []struct {
+		name string
+		args args
+		want int
+	}{
+		{
+			name: "[]byte",
+			args: args{
+				bytes: []byte("FF14 is very Good"),
+			},
+			want: 17,
+		},
+		{
+			name: "empty",
+			args: args{
+				bytes: []byte(""),
+			},
+			want: 0,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := fileIo.Write(tt.args.bytes)
+			assert.Nil(t, err)
+			assert.Equalf(t, tt.want, got, "Write(%v)", tt.args.bytes)
+		})
+	}
+}
+
+func TestFileIo_Read1(t *testing.T) {
+	fileIO, _ := NewFileIO("../testFile/sakura.data")
+	// 测试参数
+	type args struct {
+		bytes []byte
+		i     int64
+	}
+	// 预期参数
+	type wantArgs struct {
+		wantN     int
+		wantSlice []byte
+	}
+	// 测试用例
+	tests := []struct {
+		name string
+		args args
+		want wantArgs
+	}{
+		{
+			name: "[17]byte()",
+			args: args{
+				bytes: make([]byte, 17),
+				i:     0,
+			},
+			want: wantArgs{
+				wantN:     17,
+				wantSlice: []byte("FF14 is very Good"),
+			},
+		},
+		{
+			name: "[6]byte()",
+			args: args{
+				bytes: make([]byte, 6),
+				i:     17,
+			},
+			want: wantArgs{
+				wantN:     6,
+				wantSlice: []byte("Sakura"),
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			readN, err := fileIO.Read(tt.args.bytes, tt.args.i)
+			assert.Equalf(t, tt.want.wantN, readN, "")
+			assert.Nil(t, err)
+			assert.Equalf(t, tt.want.wantSlice, tt.args.bytes, "Read(%v, %v)", tt.args.bytes, tt.args.i)
+			t.Log(string(tt.args.bytes))
+		})
+	}
 }
