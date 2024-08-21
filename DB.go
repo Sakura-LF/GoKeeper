@@ -44,9 +44,11 @@ func Open(options Options) (*DB, error) {
 
 	// 如果目录不存在,则创建
 	if _, err := os.Stat(options.DirPath); os.IsNotExist(err) {
-		if err = os.MkdirAll(options.DirPath, os.ModeDir); err != nil {
+		if err = os.MkdirAll(options.DirPath, os.ModePerm); err != nil {
 			return nil, err
 		}
+	} else { // 可能是其他错误
+		return nil, err
 	}
 
 	// 初始化 DB 实例结构体
@@ -70,7 +72,9 @@ func Open(options Options) (*DB, error) {
 	return db, nil
 }
 
+// 加载数据文件
 func (db *DB) loadDataFile() error {
+	// 读取目录中的所有文件
 	dirEntries, err := os.ReadDir(db.options.DirPath)
 	if err != nil {
 		return err
@@ -79,6 +83,7 @@ func (db *DB) loadDataFile() error {
 	var fileIds []int
 	// 遍历目录中的所有文件,找到所有以 .data 结尾的文件
 	for _, entry := range dirEntries {
+		// 判断文件是否以 .data 结尾
 		if strings.HasSuffix(entry.Name(), data.DataFileNameSuffix) {
 			splitNames := strings.Split(entry.Name(), ".")
 			fileId, err := strconv.Atoi(splitNames[0])
@@ -111,6 +116,7 @@ func (db *DB) loadDataFile() error {
 
 // 从数据文件中加载索引
 // 遍历文件中的所有记录,并更新到内存索引中
+// todo db.fileids 可以不需要,直接传入 loadIndexFromDataFiles 方法也可以
 func (db *DB) loadIndexFromDataFiles() error {
 	// 没有文件,说明数据库是空的
 	if len(db.fileids) == 0 {
@@ -119,16 +125,19 @@ func (db *DB) loadIndexFromDataFiles() error {
 
 	// 遍历所有的文件id, 处理文件中的记录
 	for i, fid := range db.fileids {
-		var fileiId = uint32(fid)
+		var fileId = uint32(fid)
 		var dataFile *data.DataFile
-		if fileiId == db.activeFile.FileID {
+		// 判断文件是否是活跃文件
+		if fileId == db.activeFile.FileID {
 			dataFile = db.activeFile
 		} else {
-			dataFile = db.olderFiles[fileiId]
+			dataFile = db.olderFiles[fileId]
 		}
-
+		// 偏移量
 		var offset int64 = 0
 		for {
+			// 读取日志记录,返回的日志记录和记录大小
+			// todo 重点理解这块儿
 			logRecord, size, err := dataFile.ReadLogRecord(offset)
 			if err != nil {
 				if errors.Is(err, io.EOF) {
@@ -139,7 +148,7 @@ func (db *DB) loadIndexFromDataFiles() error {
 
 			// 构造内存索引并保存
 			logRecordPos := &data.LogRecordPos{
-				Fid:    fileiId,
+				Fid:    fileId,
 				Offset: offset,
 			}
 			if logRecord.Type == data.LogRecordDeleted {
@@ -329,6 +338,11 @@ func (db *DB) appendLogRecord(logRecord *data.LogRecord) (*data.LogRecordPos, er
 }
 
 // setActiveDataFile 设置当前活跃文件
+// 两种情况需要调用这个方法
+//
+//	1.数据库目录为空,没有活跃文件
+//	2.活跃文件写满了,转换为旧的数据文件,重新开启一个活跃文件
+//
 // 在访问此方法前必须持有互斥锁
 func (db *DB) setActiveDataFile() error {
 	var initialFileId uint32 = 0

@@ -4,6 +4,8 @@ import (
 	"errors"
 )
 
+// 定义 DataErr 类型作为 error 接口的别名
+
 var (
 	ErrKeyIsEmpty             = errors.New("the key is empty")
 	ErrIndexUpdateFailed      = errors.New("failed to update")
