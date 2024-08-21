@@ -28,7 +28,7 @@ type DB struct {
 
 	// 内存索引
 	index index.Index
-	mu    *sync.RWMutex
+	lock  *sync.RWMutex
 }
 
 // Open 启动数据库
@@ -52,7 +52,7 @@ func Open(options Options) (*DB, error) {
 	// 初始化 DB 实例结构体
 	db := &DB{
 		options:    options,
-		mu:         new(sync.RWMutex),
+		lock:       new(sync.RWMutex),
 		olderFiles: make(map[uint32]*data.DataFile),
 		index:      index.NewIndexer(options.IndexType),
 	}
@@ -196,8 +196,8 @@ func (db *DB) Put(key []byte, value []byte) error {
 
 // Get 根据 key 读取数据
 func (db *DB) Get(key []byte) ([]byte, error) {
-	db.mu.Lock()
-	defer db.mu.Unlock()
+	db.lock.Lock()
+	defer db.lock.Unlock()
 
 	// 判断 key 的有效性
 	if len(key) == 0 {
@@ -278,8 +278,8 @@ func (db *DB) Delete(key []byte) error {
 //  4. 向活跃文件中写入内容 Write()
 //  5. 返回内存索引
 func (db *DB) appendLogRecord(logRecord *data.LogRecord) (*data.LogRecordPos, error) {
-	db.mu.Lock()
-	defer db.mu.Unlock()
+	db.lock.Lock()
+	defer db.lock.Unlock()
 
 	// 判断当前活跃数据文件是否存在,因为数据库在没有写入的时候是没有文件生成的
 	// 活跃文件为空则初始化数据文件

@@ -14,6 +14,9 @@ type Options struct {
 	IndexType IndexType
 }
 
+// IndexType 索引类型
+// 数据库默认是 Btree
+// 还可以自己实现跳表，自适应基数树索引
 type IndexType = int8
 
 const (
