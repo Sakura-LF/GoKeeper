@@ -56,7 +56,7 @@ func EncodeLogRecord(logRecord *LogRecord) ([]byte, int64) {
 	var index = 5
 
 	// 之后存储 key 和 value 的长度信息
-	// PutVarint 返回写入的字节数量
+	// PutVarint 写入一个可变的 int 变量
 	index += binary.PutVarint(header[index:], int64(len(logRecord.Key)))
 	index += binary.PutVarint(header[index:], int64(len(logRecord.Value)))
 
@@ -72,9 +72,9 @@ func EncodeLogRecord(logRecord *LogRecord) ([]byte, int64) {
 	copy(resultBytes[index:], logRecord.Key)
 	copy(resultBytes[index+len(logRecord.Key):], logRecord.Value)
 
-	// 对整个 LogRecord 的数据就行crc校验
+	// 对整个 LogRecord 的数据进行 crc 校验
 	// 从索引 4 开始
-	// 0 1 2 3 表示crc校验的知
+	// 0 1 2 3 表示 crc 校验的知
 	crc := crc32.ChecksumIEEE(resultBytes[4:])
 	binary.LittleEndian.PutUint32(resultBytes, crc)
 
@@ -108,7 +108,7 @@ func DecodeLogRecordHead(buf []byte) (*LogRecordHeader, int64) {
 	return header, int64(index)
 }
 
-// 获取LogRecordCRC
+// 获取 LogRecordCRC
 func getLogRecordCRC(logRecord *LogRecord, header []byte) uint32 {
 	if logRecord == nil {
 		return 0
