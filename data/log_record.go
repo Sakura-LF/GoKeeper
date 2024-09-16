@@ -57,7 +57,10 @@ func EncodeLogRecord(logRecord *LogRecord) ([]byte, int64) {
 
 	// 之后存储 key 和 value 的长度信息
 	// PutVarint 写入一个可变的 int 变量
+	fmt.Println("len", len(logRecord.Key))
 	index += binary.PutVarint(header[index:], int64(len(logRecord.Key)))
+	fmt.Println("index:", index)
+	fmt.Println(header)
 	index += binary.PutVarint(header[index:], int64(len(logRecord.Value)))
 
 	// 计算logRecord的长度
@@ -76,15 +79,14 @@ func EncodeLogRecord(logRecord *LogRecord) ([]byte, int64) {
 	// 从索引 4 开始
 	// 0 1 2 3 表示 crc 校验的知
 	crc := crc32.ChecksumIEEE(resultBytes[4:])
-	binary.LittleEndian.PutUint32(resultBytes, crc)
-
-	fmt.Println("header length: ", index, " crc length:", crc)
+	binary.LittleEndian.PutUint32(resultBytes[:4], crc)
 
 	return resultBytes, int64(size)
 }
 
 // DecodeLogRecordHead 对 LogRecord 进行解码，返回 Header 和 size
 func DecodeLogRecordHead(buf []byte) (*LogRecordHeader, int64) {
+	// 如果传进来的长度连crc 4 个字节都没有,直接返回
 	if len(buf) <= 4 {
 		return nil, 0
 	}
@@ -96,6 +98,9 @@ func DecodeLogRecordHead(buf []byte) (*LogRecordHeader, int64) {
 
 	var index = 5
 	// 取出实际的 key size
+	// binary.varint 从索引开始取出一个变长编码
+	// 因为变长编码有最高有效位 msb,所以 Varint 会自动读出一个变长编码
+	// eg: 110 111 000 表示一个变长编码的数据
 	keySize, n := binary.Varint(buf[index:])
 	header.keySize = uint32(keySize)
 	index += n

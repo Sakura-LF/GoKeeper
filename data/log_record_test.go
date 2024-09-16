@@ -17,6 +17,7 @@ func TestEncodeLogRecord(t *testing.T) {
 	}
 	res1, logRecordHead := EncodeLogRecord(logRecord)
 	t.Log(res1)
+	t.Log(string(res1))
 	assert.NotNil(t, res1)
 	// 测试 head 长度一定大于 5 字节
 	assert.Greater(t, logRecordHead, int64(5))
