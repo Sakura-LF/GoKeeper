@@ -2,7 +2,6 @@ package data
 
 import (
 	"encoding/binary"
-	"fmt"
 	"hash/crc32"
 )
 
@@ -57,10 +56,7 @@ func EncodeLogRecord(logRecord *LogRecord) ([]byte, int64) {
 
 	// 之后存储 key 和 value 的长度信息
 	// PutVarint 写入一个可变的 int 变量
-	fmt.Println("len", len(logRecord.Key))
 	index += binary.PutVarint(header[index:], int64(len(logRecord.Key)))
-	fmt.Println("index:", index)
-	fmt.Println(header)
 	index += binary.PutVarint(header[index:], int64(len(logRecord.Value)))
 
 	// 计算logRecord的长度
@@ -119,7 +115,11 @@ func getLogRecordCRC(logRecord *LogRecord, header []byte) uint32 {
 		return 0
 	}
 
+	// 计算 header 的 crc 校验值
+	// 日志记录(Header)的结构:
+	// crc type keySize valueSize
 	crc := crc32.ChecksumIEEE(header[:])
+	// 更新 crc 校验值, 加入key 和 value的 crc 才算完整的值
 	crc = crc32.Update(crc, crc32.IEEETable, logRecord.Key)
 	crc = crc32.Update(crc, crc32.IEEETable, logRecord.Value)
 

@@ -232,7 +232,6 @@ func (db *DB) Get(key []byte) ([]byte, error) {
 		return nil, ErrDataFileNotFound
 	}
 
-	// 对李大夫函数操作
 	// 根据偏移量读取对应的数据
 	logRecord, _, err := dataFile.ReadLogRecord(logRecordPos.Offset)
 	if err != nil {
