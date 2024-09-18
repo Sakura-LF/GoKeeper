@@ -1,5 +1,13 @@
 package GoKeeper
 
+var DefaultOptions = Options{
+	//DirPath:      os.TempDir(),      // 系统临时目录
+	DirPath:      "tmp/",
+	DataFileSize: 256 * 1024 * 1024, // 256MB
+	SyncWrites:   false,             // 默认关闭每次操作进行同步
+	IndexType:    Btree,
+}
+
 type Options struct {
 	// 数据库数据目录
 	DirPath string

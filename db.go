@@ -5,6 +5,7 @@ import (
 	"GoKeeper/index"
 	"errors"
 	"io"
+	"log"
 	"os"
 	"sort"
 	"strconv"
@@ -47,8 +48,6 @@ func Open(options Options) (*DB, error) {
 		if err = os.MkdirAll(options.DirPath, os.ModePerm); err != nil {
 			return nil, err
 		}
-	} else { // 可能是其他错误
-		return nil, err
 	}
 
 	// 初始化 DB 实例结构体
@@ -68,7 +67,6 @@ func Open(options Options) (*DB, error) {
 	if err := db.loadIndexFromDataFiles(); err != nil {
 		return nil, err
 	}
-
 	return db, nil
 }
 
@@ -192,6 +190,7 @@ func (db *DB) Put(key []byte, value []byte) error {
 	// 追加写入到当前活跃数据文件中
 	pos, err := db.appendLogRecord(logRecord)
 	if err != nil {
+		log.Println(err)
 		return err
 	}
 
@@ -370,6 +369,3 @@ func checkOptions(options Options) error {
 	}
 	return nil
 }
-
-// Test1
-// test3

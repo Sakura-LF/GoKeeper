@@ -33,7 +33,7 @@ const (
 func NewIndexer(indexType IndexType) Index {
 	switch indexType {
 	case Btree:
-		NewBTree()
+		return NewBTree()
 	case ART:
 		// todo
 		return nil

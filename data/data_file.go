@@ -23,7 +23,7 @@ type DataFile struct {
 
 // OpenDataFile 打开新的数据文件
 func OpenDataFile(dirPath string, fileId uint32) (*DataFile, error) {
-	fileName := fmt.Sprintf("%s%09d%s", dirPath, fileId, DataFileNameSuffix)
+	fileName := fmt.Sprintf("%s/%09d%s", dirPath, fileId, DataFileNameSuffix)
 	fmt.Println("FileName:", fileName)
 
 	// 初始化 IOManager管理器接口
@@ -96,10 +96,11 @@ func (df *DataFile) ReadLogRecord(offset int64) (*LogRecord, int64, error) {
 }
 
 func (df *DataFile) Write(buf []byte) error {
-	_, err := df.IoManager.Write(buf)
+	n, err := df.IoManager.Write(buf)
 	if err != nil {
 		return err
 	}
+	df.WriteOff += int64(n)
 	return nil
 }
 
