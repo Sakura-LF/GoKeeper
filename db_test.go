@@ -2,7 +2,6 @@ package GoKeeper
 
 import (
 	"GoKeeper/util"
-	"fmt"
 	"github.com/stretchr/testify/assert"
 	"os"
 	"testing"
@@ -42,7 +41,7 @@ func TestDB_Put(t *testing.T) {
 	opts.DirPath = dir
 	opts.DataFileSize = 64 * 1024 * 1024
 	db, err := Open(opts)
-	//defer destroyDB(db)
+	defer destroyDB(db)
 	assert.Nil(t, err)
 	assert.NotNil(t, db)
 
@@ -52,7 +51,6 @@ func TestDB_Put(t *testing.T) {
 	val1, err := db.Get(util.GetRandomKey(1))
 	assert.Nil(t, err)
 	assert.NotNil(t, val1)
-	fmt.Println("v1:", string(val1))
 
 	// 2.重复 Put key 相同的数据
 	err = db.Put(util.GetRandomKey(1), util.GetRandomValue(10))
@@ -61,4 +59,155 @@ func TestDB_Put(t *testing.T) {
 	assert.Nil(t, err)
 	assert.NotNil(t, val2)
 	assert.NotEqual(t, val1, val2) // 确保值不相同
+
+	// 3. key 为空
+	err = db.Put(nil, util.GetRandomValue(10))
+	assert.Equal(t, ErrKeyIsEmpty, err)
+
+	// 4. value 为空
+	err = db.Put(util.GetRandomKey(10), nil)
+	assert.Nil(t, err)
+	val3, err := db.Get(util.GetRandomKey(10))
+	assert.Equal(t, 0, len(val3))
+	assert.Nil(t, err)
+
+	// 5. 写到数据文件进行转换
+	for i := 0; i < 1000000; i++ {
+		err = db.Put(util.GetRandomKey(i), util.GetRandomValue(128))
+		assert.Nil(t, err)
+	}
+	// 确保数据文件被转换, 旧数据文件数量大于2
+	assert.GreaterOrEqual(t, len(db.olderFiles), 2)
+
+	// 6.重启后再次 Put 一条数据
+	if db.activeFile != nil {
+		_ = db.activeFile.Close()
+	}
+	for _, of := range db.olderFiles {
+		if of != nil {
+			_ = of.Close()
+		}
+	}
+	// 重启数据库
+	db2, err := Open(opts)
+	//defer destroyDB(db2)
+	assert.Nil(t, err)
+	assert.NotNil(t, db2)
+	val4 := util.GetRandomValue(128)
+	err = db2.Put(util.GetRandomKey(55), val4)
+	assert.Nil(t, err)
+	val5, err := db2.Get(util.GetRandomKey(55))
+	assert.Nil(t, err)
+	assert.Equal(t, val4, val5)
+}
+
+func TestDB_Get(t *testing.T) {
+	opts := DefaultOptions
+	dir, _ := os.MkdirTemp("./tmp/", "bitcask-go-get")
+	opts.DirPath = dir
+	opts.DataFileSize = 64 * 1024 * 1024
+	db, err := Open(opts)
+	defer destroyDB(db)
+	assert.Nil(t, err)
+	assert.NotNil(t, db)
+
+	// 1. 正常读取一条数据
+	err = db.Put(util.GetRandomKey(1), util.GetRandomValue(10))
+	assert.Nil(t, err)
+	val, err := db.Get(util.GetRandomKey(1))
+	assert.Nil(t, err)
+	assert.NotNil(t, val)
+
+	// 2. 读取一个不存在的 Key
+	val2, err := db.Get(util.GetRandomKey(111))
+	assert.Nil(t, val2)
+	assert.Equal(t, ErrKeyNotFound, err)
+
+	// 3.值被重复put后读取
+	err = db.Put(util.GetRandomKey(22), util.GetRandomValue(10))
+	assert.Nil(t, err)
+	err = db.Put(util.GetRandomKey(22), util.GetRandomValue(10))
+	assert.Nil(t, err)
+
+	val3, err := db.Get(util.GetRandomKey(22))
+	assert.Nil(t, err)
+	assert.NotNil(t, val3)
+
+	// 4. 值被删除后 再次 Get
+	err = db.Put(util.GetRandomKey(100), util.GetRandomValue(10))
+	assert.Nil(t, err)
+	err = db.Delete(util.GetRandomKey(100))
+	assert.Nil(t, err)
+	val4, err := db.Get(util.GetRandomKey(100))
+	assert.Equal(t, 0, len(val4))
+	//assert.Equal(t, ErrKeyNotFound, err)
+	assert.ErrorIs(t, err, ErrKeyNotFound)
+
+	// 5.转换为旧的数据文件,从旧的数据文件上获取 value
+	for i := 0; i < 1000000; i++ {
+		err = db.Put(util.GetRandomKey(i), util.GetRandomValue(128))
+		assert.Nil(t, err)
+	}
+	assert.GreaterOrEqual(t, len(db.olderFiles), 2)
+	val5, err := db.Get(util.GetRandomKey(1000))
+	assert.Nil(t, err)
+	assert.NotNil(t, val5)
+
+	// 6. 重启后前面写入的数据都能拿到
+	if db.activeFile != nil {
+		_ = db.activeFile.Close()
+	}
+	for _, of := range db.olderFiles {
+		if of != nil {
+			_ = of.Close()
+		}
+	}
+	// 重启数据库
+	//db2, err := Open(opts)
+	////defer destroyDB(db2)
+	//val6, err := db.Get(util.GetRandomKey(1))
+	//val7, err := db.Get(util.GetRandomKey(2))
+	//val8, err := db.Get(util.GetRandomKey(3))
+	//
+	//assert.Nil(t, err)
+	//assert.Equal(t, val4, val5)
+}
+
+func TestDB_Delete(t *testing.T) {
+	opts := DefaultOptions
+	dir, _ := os.MkdirTemp("./tmp/", "bitcask-go-delete")
+	opts.DirPath = dir
+	opts.DataFileSize = 64 * 1024 * 1024
+	db, err := Open(opts)
+	defer destroyDB(db)
+	assert.Nil(t, err)
+	assert.NotNil(t, db)
+
+	// 1.正常删除一个存在的 key
+	err = db.Put(util.GetRandomKey(11), util.GetRandomValue(128))
+	assert.Nil(t, err)
+	err = db.Delete(util.GetRandomKey(11))
+	assert.Nil(t, err)
+	_, err = db.Get(util.GetRandomKey(11))
+	assert.Equal(t, ErrKeyNotFound, err)
+
+	// 2.删除一个不存在的 key
+	err = db.Delete([]byte("unknown key"))
+	assert.ErrorIs(t, err, ErrKeyNotFound)
+
+	// 3.删除一个空的 key
+	err = db.Delete(nil)
+	assert.Equal(t, ErrKeyIsEmpty, err)
+
+	// 4.值被删除之后重新 Put
+	err = db.Put(util.GetRandomKey(22), util.GetRandomValue(128))
+	assert.Nil(t, err)
+	err = db.Delete(util.GetRandomKey(22))
+	assert.Nil(t, err)
+	err = db.Put(util.GetRandomKey(22), util.GetRandomValue(128))
+	assert.Nil(t, err)
+	val1, err := db.Get(util.GetRandomKey(22))
+	assert.NotNil(t, val1)
+	assert.Nil(t, err)
+	// 重启之后
 }
