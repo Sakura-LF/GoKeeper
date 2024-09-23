@@ -4,6 +4,8 @@ import (
 	"GoKeeper/data"
 	"bytes"
 	"github.com/stretchr/testify/assert"
+	"strconv"
+	"strings"
 	"testing"
 )
 
@@ -178,5 +180,61 @@ func TestBTree_Delete(t *testing.T) {
 			success := bt.Delete(tt.args.key)
 			assert.Equalf(t, tt.want, success, "Delete(%s),Expect:(%v),Actual:(%v)", tt.args.key, tt.want, success)
 		})
+	}
+}
+
+func TestBTree_Iterator(t *testing.T) {
+	bTree1 := NewBTree()
+	// 1. BTree 为空的情况
+	iterator := bTree1.Iterator(false)
+	//t.Log(iterator.Valid())
+	assert.Equal(t, false, iterator.Valid())
+
+	// 2. BTree 不为空的情况
+	bTree1.Put([]byte("1"), &data.LogRecordPos{
+		Fid:    1,
+		Offset: 1,
+	})
+	iterator = bTree1.Iterator(false)
+	assert.NotNil(t, iterator.Key())
+	assert.NotNil(t, iterator.Value())
+	iterator.Next()
+	assert.Equal(t, false, iterator.Valid())
+
+	// 有多条数据
+	for i := 0; i < 5; i++ {
+		var builder strings.Builder
+		builder.WriteString(strconv.Itoa(i))
+		bTree1.Put([]byte(builder.String()), &data.LogRecordPos{
+			Fid:    1,
+			Offset: int64(i),
+		})
+	}
+	iterator = bTree1.Iterator(false)
+
+	for iterator.Rewind(); iterator.Valid(); iterator.Next() {
+		assert.NotNil(t, iterator.Key())
+		assert.NotNil(t, iterator.Value())
+		//t.Log("Key:", string(iterator.Key()), " Value: ", iterator.Value())
+	}
+
+	// 测试反向遍历
+	iterator = bTree1.Iterator(true)
+	for iterator.Rewind(); iterator.Valid(); iterator.Next() {
+		assert.NotNil(t, iterator.Key())
+		assert.NotNil(t, iterator.Value())
+		//t.Log("Key:", string(iterator.Key()), " Value: ", iterator.Value())
+	}
+
+	// 4.测试 Seek
+	iterator2 := bTree1.Iterator(false)
+	for iterator2.Seek([]byte("3")); iterator2.Valid(); iterator2.Next() {
+		t.Log(string(iterator2.Key()))
+	}
+
+	// 5.反向不便利测试 Seek
+	iterator3 := bTree1.Iterator(true)
+	for iterator3.Seek([]byte("1")); iterator3.Valid(); iterator3.Next() {
+		t.Log(string(iterator3.Key()))
 	}
 }

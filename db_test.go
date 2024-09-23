@@ -2,6 +2,7 @@ package GoKeeper
 
 import (
 	"GoKeeper/util"
+	"fmt"
 	"github.com/stretchr/testify/assert"
 	"os"
 	"testing"
@@ -10,14 +11,11 @@ import (
 // 测试完成之后销毁 DB 数据目录
 func destroyDB(db *DB) {
 	if db != nil {
-		if db.activeFile != nil {
-			_ = db.activeFile.Close()
+		if err := db.Close(); err != nil {
+			panic(err)
+			return
 		}
-		for _, of := range db.olderFiles {
-			if of != nil {
-				_ = of.Close()
-			}
-		}
+
 		err := os.RemoveAll(db.options.DirPath)
 		if err != nil {
 			panic(err)
@@ -210,4 +208,92 @@ func TestDB_Delete(t *testing.T) {
 	assert.NotNil(t, val1)
 	assert.Nil(t, err)
 	// 重启之后
+}
+
+func TestDB_ListKeys(t *testing.T) {
+	opts := DefaultOptions
+	dir, _ := os.MkdirTemp("./tmp/", "bitcask-go-delete")
+	opts.DirPath = dir
+	opts.DataFileSize = 64 * 1024 * 1024
+	db, err := Open(opts)
+	defer destroyDB(db)
+	assert.Nil(t, err)
+	assert.NotNil(t, db)
+
+	// 数据库为空
+	keys := db.ListKeys()
+	assert.Equal(t, 0, len(keys))
+
+	// 只有一条数据
+	err = db.Put(util.GetRandomKey(1), util.GetRandomValue(128))
+	keys2 := db.ListKeys()
+	for _, value := range keys2 {
+		fmt.Println(string(value))
+	}
+	assert.Equal(t, 1, len(keys2))
+
+	// 多条数据
+	for i := 0; i < 10; i++ {
+		err = db.Put(util.GetRandomKey(i), util.GetRandomValue(128))
+		assert.Nil(t, err)
+	}
+
+	keys3 := db.ListKeys()
+	assert.Equal(t, 10, len(keys3))
+}
+
+func TestDB_Fold(t *testing.T) {
+	opts := DefaultOptions
+	dir, _ := os.MkdirTemp("./tmp/", "bitcask-go-delete")
+	opts.DirPath = dir
+	opts.DataFileSize = 64 * 1024 * 1024
+	db, err := Open(opts)
+	defer destroyDB(db)
+	assert.Nil(t, err)
+	assert.NotNil(t, db)
+
+	// 写10条数据
+	for i := 0; i < 10; i++ {
+		err = db.Put(util.GetRandomKey(i), util.GetRandomValue(10))
+		assert.Nil(t, err)
+	}
+
+	err = db.Fold(func(key []byte, value []byte) bool {
+		//t.Log("Key:", string(key), " Value:", string(value))
+		assert.NotNil(t, key)
+		assert.NotNil(t, value)
+		return true
+	})
+	assert.Nil(t, err)
+}
+
+func TestDB_Close(t *testing.T) {
+	opts := DefaultOptions
+	dir, _ := os.MkdirTemp("./tmp/", "bitcask-go-delete")
+	opts.DirPath = dir
+	opts.DataFileSize = 64 * 1024 * 1024
+	db, err := Open(opts)
+	defer destroyDB(db)
+	assert.Nil(t, err)
+	assert.NotNil(t, db)
+
+	err = db.Put(util.GetRandomKey(1), util.GetRandomValue(10))
+	assert.Nil(t, err)
+}
+
+func TestDB_Sync(t *testing.T) {
+	opts := DefaultOptions
+	dir, _ := os.MkdirTemp("./tmp/", "bitcask-go-delete")
+	opts.DirPath = dir
+	opts.DataFileSize = 64 * 1024 * 1024
+	db, err := Open(opts)
+	defer destroyDB(db)
+	assert.Nil(t, err)
+	assert.NotNil(t, db)
+
+	err = db.Put(util.GetRandomKey(1), util.GetRandomValue(10))
+	assert.Nil(t, err)
+
+	err = db.Sync()
+	assert.Nil(t, err)
 }

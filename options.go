@@ -22,6 +22,21 @@ type Options struct {
 	IndexType IndexType
 }
 
+var DefaultIteratorOption = IteratorOption{
+	Prefix:  nil,
+	Reverse: false,
+}
+
+// IteratorOption 索引迭代器的配置项
+type IteratorOption struct {
+	// 遍历前缀为指定值的 Key,默认为空
+	Prefix []byte
+
+	// 是否反向迭代
+	// 默认正向迭代
+	Reverse bool
+}
+
 // IndexType 索引类型
 // 数据库默认是 Btree
 // 还可以自己实现跳表，自适应基数树索引
