@@ -13,6 +13,7 @@ var (
 	ErrDataFileNotFound       = errors.New("data file not found")
 	ErrDataCountDeleted       = errors.New("data has deleted")
 	ErrDataDirectoryCorrupted = errors.New("the database directory maybe corrupted")
+	ErrExceedMaxBatchNum      = errors.New("exceed max batch num")
 )
 
 //type Error interface {
@@ -25,4 +26,8 @@ var (
 //
 //func (e *OptionErr) Error() string {
 //
+//}
+
+//func Test() {
+//	errors.New()
 //}

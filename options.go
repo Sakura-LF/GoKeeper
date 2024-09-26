@@ -22,11 +22,6 @@ type Options struct {
 	IndexType IndexType
 }
 
-var DefaultIteratorOption = IteratorOption{
-	Prefix:  nil,
-	Reverse: false,
-}
-
 // IteratorOption 索引迭代器的配置项
 type IteratorOption struct {
 	// 遍历前缀为指定值的 Key,默认为空
@@ -35,6 +30,25 @@ type IteratorOption struct {
 	// 是否反向迭代
 	// 默认正向迭代
 	Reverse bool
+}
+
+var DefaultIteratorOption = IteratorOption{
+	Prefix:  nil,
+	Reverse: false,
+}
+
+// WriteBatchOptions 批量写配置项
+type WriteBatchOptions struct {
+	// 一个批次中最大的数据量
+	MaxBatchSize uint
+	// 每一次事务提交时是否持久化
+	SyncWrites bool
+}
+
+// DefaultWriteBatchOptions 默认配置
+var DefaultWriteBatchOptions = WriteBatchOptions{
+	MaxBatchSize: 1000000,
+	SyncWrites:   true,
 }
 
 // IndexType 索引类型

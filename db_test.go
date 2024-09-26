@@ -11,11 +11,14 @@ import (
 // 测试完成之后销毁 DB 数据目录
 func destroyDB(db *DB) {
 	if db != nil {
-		if err := db.Close(); err != nil {
-			panic(err)
-			return
+		if db.activeFile != nil {
+			_ = db.Close()
 		}
-
+		for _, file := range db.olderFiles {
+			if file != nil {
+				_ = file.Close()
+			}
+		}
 		err := os.RemoveAll(db.options.DirPath)
 		if err != nil {
 			panic(err)

@@ -12,6 +12,8 @@ const (
 	LogRecordNormal LogRecordType = iota
 	// LogRecordDeleted 表示删除状态
 	LogRecordDeleted
+	// LogRecordFinished 表示删除状态的标记位
+	LogRecordFinished
 )
 
 // 日志记录(Header)的结构:
@@ -39,6 +41,12 @@ type LogRecordHeader struct {
 type LogRecordPos struct {
 	Fid    uint32 // 文件 id,表示数据在哪个文件上
 	Offset int64  // 表示数据在这个文件中的偏移量
+}
+
+// TransactionRecord  暂存的日志相关数据
+type TransactionRecord struct {
+	Record *LogRecord
+	Pos    *LogRecordPos
 }
 
 // EncodeLogRecord 对 LogRecord 进行编码,返回字节数组以及长度
