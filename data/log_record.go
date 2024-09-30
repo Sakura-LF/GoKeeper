@@ -117,6 +117,31 @@ func DecodeLogRecordHead(buf []byte) (*LogRecordHeader, int64) {
 	return header, int64(index)
 }
 
+// EncodeLogRecordPos 对 logRecordPos 进行编码
+func EncodeLogRecordPos(pos *LogRecordPos) []byte {
+	// 变长编码的最大值创建切片
+	result := make([]byte, binary.MaxVarintLen32+binary.MaxVarintLen64)
+	var index = 0
+	index = binary.PutVarint(result[index:], int64(uint64(pos.Fid)))
+	index += binary.PutVarint(result[index:], pos.Offset)
+	return result[:index]
+}
+
+// DecodeLogRecordPos 对 LogRecordPos 进行解码
+func DecodeLogRecordPos(buf []byte) *LogRecordPos {
+	if len(buf) < 2 {
+		return nil
+	}
+	var index = 0
+	fileId, n := binary.Varint(buf[index:])
+	index += n
+	offset, n := binary.Varint(buf[index:])
+	return &LogRecordPos{
+		Fid:    uint32(fileId),
+		Offset: offset,
+	}
+}
+
 // 获取 LogRecordCRC
 func getLogRecordCRC(logRecord *LogRecord, header []byte) uint32 {
 	if logRecord == nil {

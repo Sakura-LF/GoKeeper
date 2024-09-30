@@ -164,8 +164,8 @@ func logRecordKeyWithSeq(key []byte, seqNo uint64) []byte {
 	return resultKey
 }
 
-// 从 Key 中解析 序列号
-func parseLogRecordSeq(key []byte) ([]byte, uint64) {
+// 解析 LogRecord 中的 key 和序列号
+func parseLogRecordKey(key []byte) ([]byte, uint64) {
 	seqNo, i := binary.Uvarint(key)
 	return key[i:], seqNo
 }

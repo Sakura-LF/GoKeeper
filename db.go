@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -32,6 +33,9 @@ type DB struct {
 
 	// 事务序列号, 全局递增
 	transactionSeq uint64
+
+	// 是否正在 merge
+	isMerging bool
 
 	lock *sync.RWMutex
 }
@@ -61,9 +65,18 @@ func Open(options Options) (*DB, error) {
 		olderFiles: make(map[uint32]*data.DataFile),
 		index:      index.NewIndexer(options.IndexType),
 	}
+	// 加载 merge 数据目录
+	if err := db.loadMergeFiles(); err != nil {
+		return nil, err
+	}
 
 	// 加载数据文件
 	if err := db.loadDataFile(); err != nil {
+		return nil, err
+	}
+
+	//  从 hint 索引文件中加载 内存索引
+	if err := db.loadIndexFromDataFiles(); err != nil {
 		return nil, err
 	}
 
@@ -156,6 +169,18 @@ func (db *DB) loadIndexFromDataFiles() error {
 		return nil
 	}
 
+	// 查看是否发生过 Merge
+	isMerge, nonMergeFileId := false, uint32(0)
+	mergerFinFileName := filepath.Join(db.options.DirPath, data.MergeFinishedFileName)
+	if _, err := os.Stat(mergerFinFileName); err == nil {
+		fid, err := db.getNonMergeFileId(db.options.DirPath)
+		if err != nil {
+			return err
+		}
+		isMerge = true
+		nonMergeFileId = fid
+	}
+
 	updateMemoryIndex := func(key []byte, recordType data.LogRecordType, pos *data.LogRecordPos) {
 		var ok bool
 		if recordType == data.LogRecordDeleted {
@@ -176,6 +201,12 @@ func (db *DB) loadIndexFromDataFiles() error {
 	// 遍历所有的文件id, 处理文件中的记录
 	for i, fid := range db.fileids {
 		var fileId = uint32(fid)
+
+		// 如果比最近未参与 merge 的文件 id 更小,则说明已经从 Hint 文件中加载索引了
+		if isMerge && fileId < nonMergeFileId {
+			continue
+		}
+
 		var dataFile *data.DataFile
 		// 判断文件是否是活跃文件
 		if fileId == db.activeFile.FileID {
@@ -203,7 +234,7 @@ func (db *DB) loadIndexFromDataFiles() error {
 			}
 
 			// 从 LogRecord 中获取 序列号
-			realKey, seqNo := parseLogRecordSeq(logRecord.Key)
+			realKey, seqNo := parseLogRecordKey(logRecord.Key)
 
 			// 非事务提交的记录,直接更新内存索引
 			if seqNo == nonTransactionKey {

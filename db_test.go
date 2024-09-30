@@ -28,10 +28,17 @@ func destroyDB(db *DB) {
 
 func TestOpen(t *testing.T) {
 	opts := DefaultOptions
-	dir, _ := os.MkdirTemp("./tmp/", "bitcask-go")
-	opts.DirPath = dir
+	//dir, _ := os.TempDir()
+	//opts.DirPath = dir
 	db, err := Open(opts)
-	defer destroyDB(db)
+	defer func(db *DB) {
+		err = db.Close()
+		if err != nil {
+			panic(err)
+		}
+	}(db)
+	db.Put(util.GetRandomKey(1), util.GetRandomValue(10))
+	t.Log(db.options.DirPath)
 	assert.Nil(t, err)
 	assert.NotNil(t, db)
 }

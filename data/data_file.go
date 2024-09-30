@@ -6,13 +6,18 @@ import (
 	"fmt"
 	"hash/crc32"
 	"io"
+	"path/filepath"
 )
 
 var (
 	ErrInvalidCRC = errors.New("invalid crc")
 )
 
-const DataFileNameSuffix = ".data"
+const (
+	DataFileNameSuffix    = ".data"
+	HintFileName          = "hint-index"
+	MergeFinishedFileName = "merge-finished"
+)
 
 // DataFile 数据文件
 type DataFile struct {
@@ -23,10 +28,30 @@ type DataFile struct {
 
 // OpenDataFile 打开新的数据文件
 func OpenDataFile(dirPath string, fileId uint32) (*DataFile, error) {
-	fileName := fmt.Sprintf("%s/%09d%s", dirPath, fileId, DataFileNameSuffix)
+	fileName := GetDataFileName(dirPath, fileId)
 	fmt.Println("FileName:", fileName)
+	return newDateFile(fileName, fileId)
+}
 
-	// 初始化 IOManager管理器接口
+// OpenHintFile 打开新的 hint 文件
+func OpenHintFile(dirPath string) (*DataFile, error) {
+	fileName := filepath.Join(dirPath, HintFileName)
+	return newDateFile(fileName, 0)
+}
+
+// OpenFinishedFileName 打开新的 hint 文件
+func OpenFinishedFileName(dirPath string) (*DataFile, error) {
+	fileName := filepath.Join(dirPath, MergeFinishedFileName)
+	return newDateFile(fileName, 0)
+}
+
+// GetDataFileName 获取数据文件名
+func GetDataFileName(dirPath string, fileId uint32) string {
+	return filepath.Join(dirPath, fmt.Sprintf("%09d", fileId)+DataFileNameSuffix)
+}
+
+func newDateFile(fileName string, fileId uint32) (*DataFile, error) {
+	// 初始化 IO Manager 管理器接口
 	ioManager, err := fio.NewIOManager(fileName)
 	if err != nil {
 		return nil, err
@@ -102,6 +127,17 @@ func (df *DataFile) Write(buf []byte) error {
 	}
 	df.WriteOff += int64(n)
 	return nil
+}
+
+// WriteHintRecord 写入索引信息到 hint 文件中
+func (df *DataFile) WriteHintRecord(key []byte, pos *LogRecordPos) error {
+	record := &LogRecord{
+		Key:   key,
+		Value: EncodeLogRecordPos(pos),
+	}
+	// 再对 logRecord 进行编码
+	logRecord, _ := EncodeLogRecord(record)
+	return df.Write(logRecord)
 }
 
 func (df *DataFile) Sync() error {
