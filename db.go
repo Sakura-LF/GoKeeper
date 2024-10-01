@@ -123,19 +123,20 @@ func Open(options Options) (*DB, error) {
 
 // Close 方法
 func (db *DB) Close() error {
+	// 关闭索引
+	if err := db.index.Close(); err != nil {
+		return err
+	}
+
 	if db.activeFile == nil {
 		return nil
 	}
 	db.lock.Lock()
 	defer db.lock.Unlock()
 
-	// 关闭索引
-	if err := db.index.Close(); err != nil {
-		return err
-	}
-
 	// 保存当前的事务序列号
 	seqNoFile, err := data.OpenSeqNoFile(db.options.DirPath)
+	defer seqNoFile.Close()
 	if err != nil {
 		return err
 	}
@@ -161,6 +162,7 @@ func (db *DB) Close() error {
 			return err
 		}
 	}
+
 	return nil
 }
 
