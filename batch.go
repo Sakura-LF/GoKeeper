@@ -29,6 +29,11 @@ type WriteBatch struct {
 
 // NewWriteBatch 创建一个 WriteBatch
 func (db *DB) NewWriteBatch(options WriteBatchOptions) *WriteBatch {
+	// 只要当索引类型是B+Tree,并且存储序列号不存在,并且不是第一次加载
+	// 就禁用当前的 WriteBatch功能
+	if db.options.IndexType == BPlusTree && !db.seqNoFileExists && !db.isInitial {
+		panic("cannot user write batch, seq no file not exists")
+	}
 	return &WriteBatch{
 		db:            db,
 		options:       options,

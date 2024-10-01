@@ -54,6 +54,23 @@ func (bt *BTree) Delete(key []byte) bool {
 	return true
 }
 
+func (bt *BTree) Size() int {
+	return bt.tree.Len()
+}
+
+func (bt *BTree) Close() error {
+	return nil
+}
+
+func (bt *BTree) Iterator(reverse bool) Iterator {
+	if bt.tree == nil {
+		return nil
+	}
+	bt.lock.RLock()
+	defer bt.lock.RUnlock()
+	return NewBTreeIterator(bt.tree, reverse)
+}
+
 // BTreeIterator  索引迭代器
 type BTreeIterator struct {
 	// 记录遍历到了哪个位置
@@ -133,17 +150,4 @@ func (bti *BTreeIterator) Value() *data.LogRecordPos {
 // Close 关闭迭代器
 func (bti *BTreeIterator) Close() {
 	bti.values = nil
-}
-
-func (bt *BTree) Iterator(reverse bool) Iterator {
-	if bt.tree == nil {
-		return nil
-	}
-	bt.lock.RLock()
-	defer bt.lock.RUnlock()
-	return NewBTreeIterator(bt.tree, reverse)
-}
-
-func (bt *BTree) Size() int {
-	return bt.tree.Len()
 }

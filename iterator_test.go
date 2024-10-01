@@ -15,13 +15,22 @@ func TestDB_NewIterator(t *testing.T) {
 	opts.DirPath = dir
 	opts.DataFileSize = 64 * 1024 * 1024
 	db, err := Open(opts)
-	defer destroyDB(db)
+	//defer destroyDB(db)
+
 	assert.Nil(t, err)
 	assert.NotNil(t, db)
 
 	// 创建迭代器
 	iterator := db.NewIterator(DefaultIteratorOption)
+	//defer iterator.Close()
 	assert.Equal(t, false, iterator.Valid())
+	iterator.Close()
+	err = db.Close()
+	if err != nil {
+		t.Fatal(err)
+		return
+	}
+	destroyDB(db)
 }
 
 func TestDB_Iterator_OneValue(t *testing.T) {
@@ -31,7 +40,7 @@ func TestDB_Iterator_OneValue(t *testing.T) {
 	opts.DirPath = dir
 	opts.DataFileSize = 64 * 1024 * 1024
 	db, err := Open(opts)
-	defer destroyDB(db)
+	//defer destroyDB(db)
 	assert.Nil(t, err)
 	assert.NotNil(t, db)
 
@@ -40,6 +49,7 @@ func TestDB_Iterator_OneValue(t *testing.T) {
 
 	// 创建迭代器
 	iterator := db.NewIterator(DefaultIteratorOption)
+	defer iterator.Close()
 	assert.Equal(t, true, iterator.Valid())
 	assert.Equal(t, util.GetRandomKey(1), iterator.Key())
 	value, err := iterator.Value()
@@ -54,7 +64,7 @@ func TestDB_Iterator_MutiValue(t *testing.T) {
 	opts.DirPath = dir
 	opts.DataFileSize = 64 * 1024 * 1024
 	db, err := Open(opts)
-	defer destroyDB(db)
+	//defer destroyDB(db)
 	assert.Nil(t, err)
 	assert.NotNil(t, db)
 
@@ -66,6 +76,7 @@ func TestDB_Iterator_MutiValue(t *testing.T) {
 
 	// 创建迭代器
 	iterator := db.NewIterator(DefaultIteratorOption)
+	defer iterator.Close()
 	for iterator.Rewind(); iterator.Valid(); iterator.Next() {
 		assert.NotNil(t, iterator.Key())
 	}
@@ -92,7 +103,7 @@ func TestDB_Iterator_Prefix(t *testing.T) {
 	opts.DirPath = dir
 	opts.DataFileSize = 64 * 1024 * 1024
 	db, err := Open(opts)
-	defer destroyDB(db)
+	//defer destroyDB(db)
 	assert.Nil(t, err)
 	assert.NotNil(t, db)
 
@@ -105,6 +116,7 @@ func TestDB_Iterator_Prefix(t *testing.T) {
 
 	// 创建无前缀的迭代器
 	iterator := db.NewIterator(DefaultIteratorOption)
+	defer iterator.Close()
 	for iterator.Rewind(); iterator.Valid(); iterator.Next() {
 		t.Log(string(iterator.Key()))
 	}

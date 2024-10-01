@@ -186,6 +186,10 @@ func (db *DB) loadMergeFiles() error {
 		if entry.Name() == data.MergeFinishedFileName {
 			isMergeFinished = true
 		}
+		// 没必要拿到事务序列号文件
+		if entry.Name() == data.SeqNoFileName {
+			continue
+		}
 		mergeFileNames = append(mergeFileNames, entry.Name())
 	}
 	// merge没有完成则直接返回

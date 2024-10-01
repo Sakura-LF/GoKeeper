@@ -7,7 +7,7 @@ var DefaultOptions = Options{
 	//DirPath:      "tmp/",
 	DataFileSize: 256 * 1024 * 1024, // 256MB
 	SyncWrites:   false,             // 默认关闭每次操作进行同步
-	IndexType:    Btree,
+	IndexType:    BPlusTree,
 }
 
 type Options struct {
@@ -64,4 +64,7 @@ const (
 
 	// ART 自适应基数树索引
 	ART
+
+	// BPlusTree 索引
+	BPlusTree
 )
