@@ -4,6 +4,8 @@ import (
 	"GoKeeper/data"
 	"GoKeeper/index"
 	"errors"
+	"fmt"
+	"github.com/gofrs/flock"
 	"io"
 	"log"
 	"os"
@@ -14,38 +16,24 @@ import (
 	"sync"
 )
 
-const seqNoKey = "seq.no"
+const (
+	seqNoKey     = "seq.no"
+	fileLockName = "flock"
+)
 
 // DB bitcask 存储引擎实现
 type DB struct {
-	// 用户配置选项
-	options Options
-
-	// 当前活跃数据文件,可以用于写入
-	activeFile *data.DataFile
-
-	// 旧的数据文件,只能用于读
-	olderFiles map[uint32]*data.DataFile
-
-	// 文件id,在加载索引的时候用
-	fileids []int
-
-	// 内存索引
-	index index.Index
-
-	// 事务序列号, 全局递增
-	transactionSeq uint64
-
-	// 是否正在 merge
-	isMerging bool
-
-	// 存储事务序列号的文件是否存在
-	seqNoFileExists bool
-
-	// 是否是第一次初始化此数据目录
-	isInitial bool
-
-	lock *sync.RWMutex
+	options         Options                   // 用户配置选项
+	activeFile      *data.DataFile            // 当前活跃数据文件,可以用于写入
+	olderFiles      map[uint32]*data.DataFile // 旧的数据文件,只能用于读
+	fileids         []int                     // 文件id,在加载索引的时候用
+	index           index.Index               // 内存索引
+	transactionSeq  uint64                    // 事务序列号, 全局递增
+	isMerging       bool                      // 是否正在 merge
+	seqNoFileExists bool                      // 存储事务序列号的文件是否存在
+	isInitial       bool                      // 是否是第一次初始化此数据目录
+	fileLock        *flock.Flock              // 文件锁:确保多个进程之间的互斥
+	lock            *sync.RWMutex
 }
 
 // Open 启动数据库
@@ -67,6 +55,17 @@ func Open(options Options) (*DB, error) {
 			return nil, err
 		}
 	}
+
+	// 判断当前数据目录是否正在使用
+	fileLock := flock.New(filepath.Join(options.DirPath, fileLockName))
+	hold, err := fileLock.TryLock()
+	if err != nil {
+		return nil, err
+	}
+	if !hold {
+		return nil, ErrDatabaseIsUsing
+	}
+
 	entries, err := os.ReadDir(options.DirPath)
 	if err != nil {
 		return nil, err
@@ -82,6 +81,7 @@ func Open(options Options) (*DB, error) {
 		olderFiles: make(map[uint32]*data.DataFile),
 		index:      index.NewIndexer(options.IndexType, options.DirPath, options.SyncWrites),
 		isInitial:  isInitial,
+		fileLock:   fileLock,
 	}
 	// 加载 merge 数据目录
 	if err = db.loadMergeFiles(); err != nil {
@@ -123,6 +123,13 @@ func Open(options Options) (*DB, error) {
 
 // Close 方法
 func (db *DB) Close() error {
+	defer func() {
+		err := db.fileLock.Unlock()
+		if err != nil {
+			panic(fmt.Sprintln("failed to unlock the directory", err))
+		}
+	}()
+
 	// 关闭索引
 	if err := db.index.Close(); err != nil {
 		return err

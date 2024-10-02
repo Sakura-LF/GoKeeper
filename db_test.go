@@ -307,3 +307,40 @@ func TestDB_Sync(t *testing.T) {
 	err = db.Sync()
 	assert.Nil(t, err)
 }
+
+func TestDB_FileLock(t *testing.T) {
+	opts := DefaultOptions
+	dir, _ := os.MkdirTemp("./tmp/", "bitcask-go-delete")
+	opts.DirPath = dir
+	opts.DataFileSize = 64 * 1024 * 1024
+	db, err := Open(opts)
+	defer destroyDB(db)
+	assert.Nil(t, err)
+	assert.NotNil(t, db)
+	defer db.Close()
+
+	db2, err := Open(opts)
+	t.Log(db2)
+	t.Log(err)
+	assert.Nil(t, db2)
+	assert.ErrorIs(t, err, ErrDatabaseIsUsing)
+}
+
+func TestDB_FileLock2(t *testing.T) {
+	opts := DefaultOptions
+	dir, _ := os.MkdirTemp("./tmp/", "bitcask-go-delete")
+	opts.DirPath = dir
+	opts.DataFileSize = 64 * 1024 * 1024
+	db, err := Open(opts)
+	defer destroyDB(db)
+	assert.Nil(t, err)
+	assert.NotNil(t, db)
+	// 关闭之后再打开
+	db.Close()
+
+	db2, err := Open(opts)
+	defer db2.Close()
+
+	assert.NotNil(t, db2)
+	assert.Nil(t, err)
+}
