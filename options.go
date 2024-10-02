@@ -1,12 +1,15 @@
 package GoKeeper
 
-import "os"
+import (
+	"os"
+)
 
 var DefaultOptions = Options{
 	DirPath: os.TempDir(), // 系统临时目录
 	//DirPath:      "tmp/",
 	DataFileSize: 256 * 1024 * 1024, // 256MB
 	SyncWrites:   false,             // 默认关闭每次操作进行同步
+	BytesPerSync: 0,
 	IndexType:    BPlusTree,
 }
 
@@ -19,6 +22,10 @@ type Options struct {
 
 	// 每次写入数据后是否要对数据进行安全的持久化
 	SyncWrites bool
+
+	// 累计写到多少字节进行持久化
+	// Default: 0 表示不开启此功能
+	BytesPerSync uint
 
 	// 索引类型(Btree,ART....)
 	IndexType IndexType

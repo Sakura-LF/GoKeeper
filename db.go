@@ -33,6 +33,7 @@ type DB struct {
 	seqNoFileExists bool                      // 存储事务序列号的文件是否存在
 	isInitial       bool                      // 是否是第一次初始化此数据目录
 	fileLock        *flock.Flock              // 文件锁:确保多个进程之间的互斥
+	byteWrite       uint                      // 表示数据库已经写入的字节数
 	lock            *sync.RWMutex
 }
 
@@ -540,10 +541,21 @@ func (db *DB) appendLogRecord(logRecord *data.LogRecord) (*data.LogRecordPos, er
 		return nil, err
 	}
 
+	db.byteWrite += uint(size)
 	// 根据用户配置决定是否每次写入持久化
-	if db.options.SyncWrites {
+	// 如果打开了每次写入持久化, 则根据写入字节的持久化策略就失效
+	needSync := db.options.SyncWrites
+	if !needSync && db.options.BytesPerSync > 0 && db.byteWrite >= db.options.BytesPerSync {
+		needSync = true
+	}
+
+	if needSync {
 		if err := db.activeFile.Sync(); err != nil {
 			return nil, err
+		}
+		// 清空累计值
+		if db.byteWrite > 0 {
+			db.byteWrite = 0
 		}
 	}
 
