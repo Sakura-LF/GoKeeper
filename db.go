@@ -2,6 +2,7 @@ package GoKeeper
 
 import (
 	"GoKeeper/data"
+	"GoKeeper/fio"
 	"GoKeeper/index"
 	"errors"
 	"fmt"
@@ -103,6 +104,13 @@ func Open(options Options) (*DB, error) {
 		// 从数据文件中加载索引
 		if err = db.loadIndexFromDataFiles(); err != nil {
 			return nil, err
+		}
+
+		// 重置 IO 类型为标准文件 IO
+		if db.options.MMapStartup {
+			if err := db.resetIoType(); err != nil {
+				return nil, err
+			}
 		}
 	}
 	// 取出当前的事务序列号
@@ -214,7 +222,13 @@ func (db *DB) loadDataFile() error {
 
 	// 遍历每个文件id,打开对应的数据文件
 	for i, fid := range fileIds {
-		datafile, err := data.OpenDataFile(db.options.DirPath, uint32(fid))
+		// 数据库启动加载数据文件的时候,使用 MMap 方式打开数据文件
+		ioType := fio.StandardFIO
+		if db.options.MMapStartup {
+			ioType = fio.MemoryMapFIO
+		}
+
+		datafile, err := data.OpenDataFile(db.options.DirPath, uint32(fid), ioType)
 		if err != nil {
 			return err
 		}
@@ -582,7 +596,8 @@ func (db *DB) setActiveDataFile() error {
 	}
 	// 打开最新的数据文件
 	// 传入数据库配置中的路径,已经刚才初始化好的文件id
-	file, err := data.OpenDataFile(db.options.DirPath, initialFileId)
+	// 使用标准文件IO打开数据文件
+	file, err := data.OpenDataFile(db.options.DirPath, initialFileId, fio.StandardFIO)
 	if err != nil {
 		return err
 	}
@@ -619,4 +634,23 @@ func (db *DB) loadSeqNo() error {
 	db.seqNoFileExists = true
 
 	return os.Remove(fileName)
+}
+
+// 将数据文件的 IO 类型设置为标准IO
+func (db *DB) resetIoType() error {
+	if db.activeFile == nil {
+		return nil
+	}
+	// 重置活跃文件的 IO 类型
+	if err := db.activeFile.SetIOManager(db.options.DirPath, fio.StandardFIO); err != nil {
+		return err
+	}
+
+	// 重置旧的数据文件IO 类型
+	for _, dataFile := range db.olderFiles {
+		if err := dataFile.SetIOManager(db.options.DirPath, fio.StandardFIO); err != nil {
+			return err
+		}
+	}
+	return nil
 }

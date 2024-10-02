@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"os"
 	"testing"
+	"time"
 )
 
 // 测试完成之后销毁 DB 数据目录
@@ -343,4 +344,22 @@ func TestDB_FileLock2(t *testing.T) {
 
 	assert.NotNil(t, db2)
 	assert.Nil(t, err)
+}
+
+// 测试开始 mmap 和 非 mmap 时数据库启动的耗时
+func TestDB_Open2(t *testing.T) {
+	opts := DefaultOptions
+	opts.DirPath = "./tmp/goKeeper-open"
+	opts.MMapStartup = false
+	now := time.Now()
+	db, err := Open(opts)
+	t.Log("open time:", time.Since(now))
+	assert.Nil(t, err)
+	assert.NotNil(t, db)
+
+	// Put 数据
+	//for i := 0; i < 5000000; i++ {
+	//	err = db.Put(util.GetRandomKey(i), util.GetRandomValue(128))
+	//	assert.Nil(t, err)
+	//}
 }

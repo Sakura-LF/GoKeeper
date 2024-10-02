@@ -28,28 +28,28 @@ type DataFile struct {
 }
 
 // OpenDataFile 打开新的数据文件
-func OpenDataFile(dirPath string, fileId uint32) (*DataFile, error) {
+func OpenDataFile(dirPath string, fileId uint32, ioType fio.FileIOType) (*DataFile, error) {
 	fileName := GetDataFileName(dirPath, fileId)
 	fmt.Println("FileName:", fileName)
-	return newDateFile(fileName, fileId)
+	return newDateFile(fileName, fileId, ioType)
 }
 
 // OpenHintFile 打开新的 hint 文件
 func OpenHintFile(dirPath string) (*DataFile, error) {
 	fileName := filepath.Join(dirPath, HintFileName)
-	return newDateFile(fileName, 0)
+	return newDateFile(fileName, 0, fio.StandardFIO)
 }
 
 // OpenFinishedFileName 打开新的 hint 文件
 func OpenFinishedFileName(dirPath string) (*DataFile, error) {
 	fileName := filepath.Join(dirPath, MergeFinishedFileName)
-	return newDateFile(fileName, 0)
+	return newDateFile(fileName, 0, fio.StandardFIO)
 }
 
 // OpenSeqNoFile 打开事务序列号文件
 func OpenSeqNoFile(dirPath string) (*DataFile, error) {
 	fileName := filepath.Join(dirPath, SeqNoFileName)
-	return newDateFile(fileName, 0)
+	return newDateFile(fileName, 0, fio.StandardFIO)
 }
 
 // GetDataFileName 获取数据文件名
@@ -57,9 +57,9 @@ func GetDataFileName(dirPath string, fileId uint32) string {
 	return filepath.Join(dirPath, fmt.Sprintf("%09d", fileId)+DataFileNameSuffix)
 }
 
-func newDateFile(fileName string, fileId uint32) (*DataFile, error) {
+func newDateFile(fileName string, fileId uint32, ioType fio.FileIOType) (*DataFile, error) {
 	// 初始化 IO Manager 管理器接口
-	ioManager, err := fio.NewIOManager(fileName)
+	ioManager, err := fio.NewIOManager(fileName, ioType)
 	if err != nil {
 		return nil, err
 	}
@@ -162,4 +162,16 @@ func (df *DataFile) readNBytes(n int64, offset int64) ([]byte, error) {
 		return b, err
 	}
 	return b, err
+}
+
+func (df *DataFile) SetIOManager(dirPath string, ioType fio.FileIOType) error {
+	if err := df.IoManager.Close(); err != nil {
+		return err
+	}
+	ioManager, err := fio.NewIOManager(GetDataFileName(dirPath, df.FileID), ioType)
+	if err != nil {
+		return err
+	}
+	df.IoManager = ioManager
+	return nil
 }

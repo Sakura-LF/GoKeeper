@@ -1,27 +1,28 @@
 package data
 
 import (
+	"GoKeeper/fio"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestDataFile_Open(t *testing.T) {
-	file, err := OpenDataFile("../tmp/", 0)
+	file, err := OpenDataFile("../tmp/", 0, fio.StandardFIO)
 	assert.Nil(t, err)
 	assert.NotNil(t, file)
 
 	//t.Log(os.TempDir())
-	file2, err := OpenDataFile("../tmp/", 111)
+	file2, err := OpenDataFile("../tmp/", 111, fio.StandardFIO)
 	assert.Nil(t, err)
 	assert.NotNil(t, file2)
 
-	file3, err := OpenDataFile("../tmp/", 111)
+	file3, err := OpenDataFile("../tmp/", 111, fio.StandardFIO)
 	assert.Nil(t, err)
 	assert.NotNil(t, file3)
 }
 
 func TestDataFile_Write(t *testing.T) {
-	file, err := OpenDataFile("../tmp/", 0)
+	file, err := OpenDataFile("../tmp/", 0, fio.StandardFIO)
 	assert.Nil(t, err)
 	assert.NotNil(t, file)
 
@@ -36,7 +37,7 @@ func TestDataFile_Write(t *testing.T) {
 }
 
 func TestDataFile_Close(t *testing.T) {
-	file, err := OpenDataFile("../tmp/", 123)
+	file, err := OpenDataFile("../tmp/", 123, fio.StandardFIO)
 	assert.Nil(t, err)
 	assert.NotNil(t, file)
 
@@ -48,7 +49,7 @@ func TestDataFile_Close(t *testing.T) {
 }
 
 func TestDataFile_Sync(t *testing.T) {
-	file, err := OpenDataFile("../tmp/", 456)
+	file, err := OpenDataFile("../tmp/", 456, fio.StandardFIO)
 	assert.Nil(t, err)
 	assert.NotNil(t, file)
 
@@ -60,7 +61,7 @@ func TestDataFile_Sync(t *testing.T) {
 }
 
 func TestDataFile_ReadLogRecord(t *testing.T) {
-	file, err := OpenDataFile("../tmp/", 789)
+	file, err := OpenDataFile("../tmp/", 789, fio.StandardFIO)
 	assert.Nil(t, err)
 	assert.NotNil(t, file)
 	//defer file.Close()
