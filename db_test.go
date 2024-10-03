@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/stretchr/testify/assert"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 )
@@ -248,7 +249,6 @@ func TestDB_ListKeys(t *testing.T) {
 		err = db.Put(util.GetRandomKey(i), util.GetRandomValue(128))
 		assert.Nil(t, err)
 	}
-
 	keys3 := db.ListKeys()
 	assert.Equal(t, 10, len(keys3))
 }
@@ -394,5 +394,35 @@ func TestOpen2(t *testing.T) {
 	//db.Delete([]byte("key"))
 	stat = db.Stat()
 	t.Logf("%+v", stat)
+}
 
+func TestDB_Backup(t *testing.T) {
+	opts := DefaultOptions
+	opts.DirPath = filepath.Join("./tmp", "goKeeper")
+	opts.MMapStartup = true
+	db, err := Open(opts)
+	//defer destroyDB(db)
+	defer db.Close()
+	assert.Nil(t, err)
+	assert.NotNil(t, db)
+
+	err = db.Put(util.GetRandomKey(1), util.GetRandomValue(128))
+	assert.Nil(t, err)
+
+	backupDir := filepath.Join("./tmp", "gokeeper-backup")
+	t.Log(backupDir)
+	err = os.MkdirAll(backupDir, os.ModePerm)
+	assert.Nil(t, err)
+	// 测试备份功能
+	err = db.Backup(backupDir)
+	assert.Nil(t, err)
+
+	// 使用备份目录启动数据库
+	opts2 := DefaultOptions
+	opts2.DirPath = backupDir
+	db2, err := Open(opts2)
+	//defer destroyDB(db2)
+	defer db2.Close()
+	assert.Nil(t, err)
+	assert.NotNil(t, db2)
 }

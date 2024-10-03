@@ -390,6 +390,13 @@ func (db *DB) Stat() *Stat {
 	}
 }
 
+// Backup 拷贝数据库
+func (db *DB) Backup(dirPath string) error {
+	db.lock.Lock()
+	defer db.lock.Unlock()
+	return util.CopyDir(db.options.DirPath, dirPath, []string{fileLockName})
+}
+
 // Put 写入key/value数据,key不能为空
 // 流程:
 //  1. 首先判断 key 是否有效
