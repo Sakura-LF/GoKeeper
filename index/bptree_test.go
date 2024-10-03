@@ -11,27 +11,38 @@ import (
 
 func TestNewBPTree(t *testing.T) {
 	path := filepath.Join("../tmp")
-	defer func() {
-		err := os.RemoveAll(path)
-		if err != nil {
-			log.Println(err)
-			return
-		}
-	}()
+	os.MkdirAll(path, os.ModePerm)
+	//defer func() {
+	//	err := os.RemoveAll(path)
+	//	if err != nil {
+	//		log.Println(err)
+	//		return
+	//	}
+	//}()
 	tree := NewBPlusTree(path, false)
 	assert.NotNil(t, tree)
 
+	// 1. Put 一个 key
 	put := tree.Put([]byte("hello"), &data.LogRecordPos{Fid: 1, Offset: 10})
-	assert.True(t, put)
+	assert.Nil(t, put)
+
+	// 2. Put 一个存在的 key
 	put = tree.Put([]byte("hello"), &data.LogRecordPos{Fid: 2, Offset: 20})
-	assert.True(t, put)
+	assert.NotNil(t, put)
+	assert.Equal(t, uint32(1), put.Fid)
+	assert.Equal(t, int64(10), put.Offset)
+
+	// 3. Put 一个重复的 key
 	put = tree.Put([]byte("hello"), &data.LogRecordPos{Fid: 3, Offset: 30})
-	assert.True(t, put)
+	assert.NotNil(t, put)
+	assert.Equal(t, uint32(2), put.Fid)
+	assert.Equal(t, int64(20), put.Offset)
 	tree.tree.Close()
 }
 
 func TestNewBPTree_Get(t *testing.T) {
 	path := filepath.Join("../tmp")
+	os.MkdirAll(path, os.ModePerm)
 	defer func() {
 		err := os.RemoveAll(path)
 		if err != nil {
@@ -48,7 +59,8 @@ func TestNewBPTree_Get(t *testing.T) {
 
 	// 二: Get 一个存在的 key
 	put := tree.Put([]byte("1"), &data.LogRecordPos{Fid: 1, Offset: 10})
-	assert.True(t, put)
+	assert.Nil(t, put)
+
 	value = tree.Get([]byte("1"))
 	assert.NotNil(t, value)
 	assert.Equal(t, uint32(1), value.Fid)
@@ -56,15 +68,18 @@ func TestNewBPTree_Get(t *testing.T) {
 
 	// 三: 重复 Put 再 Get
 	put = tree.Put([]byte("1"), &data.LogRecordPos{Fid: 2, Offset: 20})
-	assert.True(t, put)
+	assert.NotNil(t, put)
+
 	value = tree.Get([]byte("1"))
 	assert.NotNil(t, value)
 	assert.Equal(t, uint32(2), value.Fid)
 	assert.Equal(t, int64(20), value.Offset)
+
+	tree.tree.Close()
 }
 
 func TestNewBPTree_Delete(t *testing.T) {
-	path := filepath.Join(os.TempDir(), "bptree")
+	path := filepath.Join("../tmp")
 	os.MkdirAll(path, os.ModePerm)
 	defer func() {
 		err := os.RemoveAll(path)
@@ -78,16 +93,19 @@ func TestNewBPTree_Delete(t *testing.T) {
 	//assert.Equal(t, 0, tree.Size())
 
 	// 1. 删除一个不存在的 key
-	ok := tree.Delete([]byte("saf"))
-	assert.False(t, ok)
+	pos, deleted := tree.Delete([]byte("saf"))
+	assert.Nil(t, pos)
+	assert.False(t, deleted)
 
 	// 2. 删除一个存在的 key
-	tree.Put([]byte("hello"), &data.LogRecordPos{Fid: 1, Offset: 10})
-	ok = tree.Delete([]byte("hello"))
-	assert.True(t, ok)
-	value := tree.Get([]byte("hello"))
-	assert.Nil(t, value)
-	//assert.Nil(t, err)
+	put := tree.Put([]byte("hello"), &data.LogRecordPos{Fid: 1, Offset: 10})
+	assert.Nil(t, put)
+
+	record, deleted := tree.Delete([]byte("hello"))
+	assert.NotNil(t, record)
+	assert.True(t, deleted)
+	assert.Equal(t, uint32(1), record.Fid)
+	assert.Equal(t, int64(10), record.Offset)
 
 	tree.tree.Close()
 }

@@ -14,22 +14,12 @@ var (
 	ErrDataCountDeleted       = errors.New("data has deleted")
 	ErrDataDirectoryCorrupted = errors.New("the database directory maybe corrupted")
 	ErrExceedMaxBatchNum      = errors.New("exceed max batch num")
-	ErrMergeIsRunning         = errors.New("merge is running, try again later")
 	ErrDatabaseIsUsing        = errors.New("database is using by another process")
 )
 
-//type Error interface {
-//	error
-//}
-//
-//type OptionErr struct {
-//	DirPath string
-//}
-//
-//func (e *OptionErr) Error() string {
-//
-//}
-
-//func Test() {
-//	errors.New()
-//}
+// Merge Error
+var (
+	ErrMergeIsRunning          = errors.New("merge is running, try again later")
+	ErrMergeNotExceedThreshold = errors.New("the amount of data does not exceed the threshold")
+	ErrDiskSpaceNotEnough      = errors.New("disk space is not enough")
+)

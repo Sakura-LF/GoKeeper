@@ -23,15 +23,18 @@ func NewBTree() *BTree {
 
 // Put 写入数据
 // 因为 BTree insert 需要一个Item接口,所以需要自己定义Item结构体
-func (bt *BTree) Put(key []byte, pos *data.LogRecordPos) bool {
+func (bt *BTree) Put(key []byte, pos *data.LogRecordPos) *data.LogRecordPos {
 	it := &Item{
 		key: key,
 		pos: pos,
 	}
 	bt.lock.Lock()
 	defer bt.lock.Unlock()
-	bt.tree.ReplaceOrInsert(it)
-	return true
+	oldItem := bt.tree.ReplaceOrInsert(it)
+	if oldItem == nil {
+		return nil
+	}
+	return oldItem.(*Item).pos
 }
 
 func (bt *BTree) Get(key []byte) *data.LogRecordPos {
@@ -44,14 +47,15 @@ func (bt *BTree) Get(key []byte) *data.LogRecordPos {
 }
 
 // Delete 删除修改的代码
-func (bt *BTree) Delete(key []byte) bool {
+func (bt *BTree) Delete(key []byte) (*data.LogRecordPos, bool) {
 	it := &Item{key: key}
 	bt.lock.Lock()
 	defer bt.lock.Unlock()
-	if item := bt.tree.Delete(it); item == nil {
-		return false
+	oldItem := bt.tree.Delete(it)
+	if oldItem == nil {
+		return nil, false
 	}
-	return true
+	return oldItem.(*Item).pos, true
 }
 
 func (bt *BTree) Size() int {

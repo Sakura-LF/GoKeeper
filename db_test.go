@@ -350,7 +350,7 @@ func TestDB_FileLock2(t *testing.T) {
 func TestDB_Open2(t *testing.T) {
 	opts := DefaultOptions
 	opts.DirPath = "./tmp/goKeeper-open"
-	opts.MMapStartup = false
+	opts.MMapStartup = true
 	now := time.Now()
 	db, err := Open(opts)
 	t.Log("open time:", time.Since(now))
@@ -358,8 +358,41 @@ func TestDB_Open2(t *testing.T) {
 	assert.NotNil(t, db)
 
 	// Put 数据
-	//for i := 0; i < 5000000; i++ {
-	//	err = db.Put(util.GetRandomKey(i), util.GetRandomValue(128))
+	for i := 0; i < 1000000; i++ {
+		err = db.Put(util.GetRandomKey(i), util.GetRandomValue(128))
+		assert.Nil(t, err)
+	}
+}
+
+// 测试数据库的累计失效数据量是否正常
+func TestOpen2(t *testing.T) {
+	opts := DefaultOptions
+	opts.DirPath = "./tmp/goKeeper-open"
+	opts.MMapStartup = true
+	db, err := Open(opts)
+	defer destroyDB(db)
+	defer db.Close()
+	assert.Nil(t, err)
+	assert.NotNil(t, db)
+
+	//写100 条数据
+	for i := 100; i < 10000; i++ {
+		err = db.Put(util.GetRandomKey(i), util.GetRandomValue(128))
+		assert.Nil(t, err)
+	}
+	stat := db.Stat()
+	// 1. 测试 keyNum 数量
+	assert.Equal(t, 9900, stat.KeyNum)
+
+	// 删除 100 条数据
+	//for i := 100; i < 10000; i++ {
+	//	err = db.Delete(util.GetRandomKey(i))
 	//	assert.Nil(t, err)
 	//}
+	//err = db.Put([]byte("key"), []byte("value"))
+	//assert.Nil(t, err)
+	//db.Delete([]byte("key"))
+	stat = db.Stat()
+	t.Logf("%+v", stat)
+
 }

@@ -4,6 +4,7 @@ import (
 	"GoKeeper/data"
 	"GoKeeper/fio"
 	"GoKeeper/index"
+	"GoKeeper/util"
 	"errors"
 	"fmt"
 	"github.com/gofrs/flock"
@@ -35,7 +36,16 @@ type DB struct {
 	isInitial       bool                      // 是否是第一次初始化此数据目录
 	fileLock        *flock.Flock              // 文件锁:确保多个进程之间的互斥
 	byteWrite       uint                      // 表示数据库已经写入的字节数
+	reclaimSize     int64                     // 表示有多少数据是无效的
 	lock            *sync.RWMutex
+}
+
+// Stat 存储数据库引擎状态
+type Stat struct {
+	KeyNum          uint  // key 的总数
+	DataFileNum     uint  // 数据文件总数
+	ReclaimableSize int64 // 可以进行 merge 回收的数据量, 单位为字节
+	DiskSize        int64 // 数据目录所占用磁盘空间的大小
 }
 
 // Open 启动数据库
@@ -263,14 +273,15 @@ func (db *DB) loadIndexFromDataFiles() error {
 	}
 
 	updateMemoryIndex := func(key []byte, recordType data.LogRecordType, pos *data.LogRecordPos) {
-		var ok bool
+		var oldPos *data.LogRecordPos
 		if recordType == data.LogRecordDeleted {
-			ok = db.index.Delete(key)
+			oldPos, _ = db.index.Delete(key)
+			db.reclaimSize += int64(pos.Size) // 删除数据这条记录的大小,也是需要记录的
 		} else {
-			ok = db.index.Put(key, pos)
+			oldPos = db.index.Put(key, pos)
 		}
-		if !ok {
-			panic("failed to update index start")
+		if oldPos != nil {
+			db.reclaimSize += int64(oldPos.Size)
 		}
 	}
 
@@ -312,6 +323,7 @@ func (db *DB) loadIndexFromDataFiles() error {
 			logRecordPos := &data.LogRecordPos{
 				Fid:    fileId,
 				Offset: offset,
+				Size:   uint32(size),
 			}
 
 			// 从 LogRecord 中获取 序列号
@@ -357,6 +369,27 @@ func (db *DB) loadIndexFromDataFiles() error {
 	return nil
 }
 
+// Stat 统计数据库状态信息
+func (db *DB) Stat() *Stat {
+	db.lock.RLock()
+	defer db.lock.RUnlock()
+
+	var dataFiles = uint(len(db.olderFiles))
+	if db.activeFile != nil {
+		dataFiles++
+	}
+	size, err := util.DirSize(db.options.DirPath)
+	if err != nil {
+		return nil
+	}
+	return &Stat{
+		KeyNum:          uint(db.index.Size()),
+		DataFileNum:     dataFiles,
+		ReclaimableSize: db.reclaimSize,
+		DiskSize:        size, // todo
+	}
+}
+
 // Put 写入key/value数据,key不能为空
 // 流程:
 //  1. 首先判断 key 是否有效
@@ -385,8 +418,8 @@ func (db *DB) Put(key []byte, value []byte) error {
 	}
 
 	// 更新内存索引
-	if ok := db.index.Put(key, pos); !ok {
-		return ErrIndexUpdateFailed
+	if oldVal := db.index.Put(key, pos); oldVal != nil {
+		db.reclaimSize += int64(oldVal.Size)
 	}
 
 	return nil
@@ -493,15 +526,19 @@ func (db *DB) Delete(key []byte) error {
 		Type: data.LogRecordDeleted,
 	}
 	// 写入到数据文件中
-	_, err := db.appendLogRecordWithLock(logRecord)
+	pos, err := db.appendLogRecordWithLock(logRecord)
 	if err != nil {
 		return nil
 	}
+	db.reclaimSize += int64(pos.Size) // 将 Delete 这条日志记录的 Size 加入到回收空间中
 
 	// 从内存索引中删除对应的 Key
-	ok := db.index.Delete(key)
+	oldPos, ok := db.index.Delete(key)
 	if !ok {
 		return ErrIndexUpdateFailed
+	}
+	if oldPos != nil {
+		db.reclaimSize += int64(oldPos.Size)
 	}
 	return nil
 }
@@ -577,6 +614,7 @@ func (db *DB) appendLogRecord(logRecord *data.LogRecord) (*data.LogRecordPos, er
 	pos := &data.LogRecordPos{
 		Fid:    db.activeFile.FileID,
 		Offset: writeOff,
+		Size:   uint32(size),
 	}
 	return pos, nil
 }
@@ -612,6 +650,9 @@ func checkOptions(options Options) error {
 	}
 	if options.DataFileSize <= 0 {
 		return errors.New("database datafileSize must >= 0")
+	}
+	if options.MergeThreshold < 0 || options.MergeThreshold > 1 {
+		return errors.New("database mergeThreshold must >= 0 and <= 1")
 	}
 	return nil
 }

@@ -7,11 +7,12 @@ import (
 var DefaultOptions = Options{
 	DirPath: os.TempDir(), // 系统临时目录
 	//DirPath:      "tmp/",
-	DataFileSize: 256 * 1024 * 1024, // 256MB
-	SyncWrites:   false,             // 默认关闭每次操作进行同步
-	BytesPerSync: 0,
-	IndexType:    Btree,
-	MMapStartup:  true,
+	DataFileSize:   256 * 1024 * 1024, // 256MB
+	SyncWrites:     false,             // 默认关闭每次操作进行同步
+	BytesPerSync:   0,
+	IndexType:      Btree,
+	MMapStartup:    true,
+	MergeThreshold: 0.5,
 }
 
 type Options struct {
@@ -33,6 +34,9 @@ type Options struct {
 
 	// 是否在启动时进行 mmap 的加载
 	MMapStartup bool
+
+	// 数据文件合并的阈值,无效数组占总数据的多少
+	MergeThreshold float32
 }
 
 // IteratorOption 索引迭代器的配置项

@@ -2,6 +2,7 @@ package GoKeeper
 
 import (
 	"GoKeeper/data"
+	"GoKeeper/util"
 	"io"
 	"os"
 	"path"
@@ -28,6 +29,31 @@ func (db *DB) Merge() error {
 		db.lock.Unlock()
 		return ErrMergeIsRunning
 	}
+
+	// 查看可以 merge 的数据量是否达到了阈值
+	size, err := util.DirSize(db.options.DirPath)
+	if err != nil {
+		db.lock.Unlock()
+		return err
+	}
+	if float32(size)/float32(db.options.DataFileSize) < db.options.MergeThreshold {
+		// 数据量未达到阈值,直接返回
+		db.lock.Unlock()
+		return ErrMergeNotExceedThreshold
+	}
+
+	// 查看剩余空间容量是否可以容纳 merge 之后的数据量
+	// todo 获取剩余磁盘空间的方法没法跨平台,暂时不是先
+	//availableDiskSize, err := util.AvailableDiskSize()
+	//if err != nil {
+	//	db.lock.Unlock()
+	//	return err
+	//}
+	//if uint64(size-db.reclaimSize) >= availableDiskSize {
+	//	db.lock.Unlock()
+	//	return ErrDiskSpaceNotEnough
+	//}
+
 	db.isMerging = true
 	defer func() {
 		db.isMerging = false
@@ -180,6 +206,8 @@ func (db *DB) loadMergeFiles() error {
 	if err != nil {
 		return err
 	}
+
+	// 查找 merge 完成的文件,判断 merge 是否处理完毕
 	var isMergeFinished bool
 	mergeFileNames := make([]string, 0, 20)
 	for _, entry := range dir {
