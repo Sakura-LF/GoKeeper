@@ -382,7 +382,7 @@ func TestOpen2(t *testing.T) {
 	}
 	stat := db.Stat()
 	// 1. 测试 keyNum 数量
-	assert.Equal(t, 9900, stat.KeyNum)
+	assert.Equal(t, uint(9900), stat.KeyNum)
 
 	// 删除 100 条数据
 	//for i := 100; i < 10000; i++ {
