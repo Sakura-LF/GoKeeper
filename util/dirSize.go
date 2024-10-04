@@ -1,10 +1,11 @@
 package util
 
 import (
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
-	"strings"
+	"sync"
 	"syscall"
 )
 
@@ -43,37 +44,76 @@ func AvailableDiskSize() (uint64, error) {
 // src 数据目录
 // dst 目标目录
 // exclude 排除文件
-func CopyDir(src, dst string, exclude []string) error {
-	// 如果目标文件夹不存在，则创建
+func CopyDir(src, dst string, excludes []string) error {
 	if _, err := os.Stat(dst); os.IsNotExist(err) {
 		if err = os.MkdirAll(dst, os.ModePerm); err != nil {
 			return err
 		}
 	}
+	task := make(chan string, 100)
 
-	// 循环遍历源路径,
-	return filepath.Walk(src, func(path string, info fs.FileInfo, err error) error {
-		fileName := strings.Replace(path, src, "", 1)
-		if fileName == "" {
+	wg := &sync.WaitGroup{}
+
+	if err := filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
+		if path == src {
 			return nil
 		}
-		for _, file := range exclude {
-			matched, err := filepath.Match(file, info.Name())
-			if err != nil {
-				return err
-			}
-			if matched {
+		fileName := filepath.Base(path)
+
+		// 排除文件
+		for _, excludeFile := range excludes {
+			if fileName == excludeFile {
 				return nil
 			}
 		}
-		if info.IsDir() {
-			return os.MkdirAll(filepath.Join(dst, fileName), info.Mode())
-		}
 
-		data, err := os.ReadFile(filepath.Join(src, fileName))
+		// 向队列中添加文件名
+		task <- fileName
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	for i := 0; i < len(task); i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			err := Worker(src, dst, task)
+			if err != nil {
+				return
+			}
+		}()
+	}
+
+	wg.Wait()
+	return nil
+}
+
+func Worker(src, dst string, task chan string) error {
+	fileName := <-task
+
+	srcFile, err := os.Open(filepath.Join(src, fileName))
+	if err != nil {
+		return err
+	}
+	defer func(srcFile *os.File) {
+		err := srcFile.Close()
 		if err != nil {
-			return err
+			return
 		}
-		return os.WriteFile(filepath.Join(dst, fileName), data, info.Mode())
-	})
+	}(srcFile)
+
+	dstFile, err := os.Create(filepath.Join(dst, fileName))
+	if err != nil {
+		return err
+	}
+	defer func(dstFile *os.File) {
+		err := dstFile.Close()
+		if err != nil {
+			return
+		}
+	}(dstFile)
+
+	_, err = io.Copy(dstFile, srcFile)
+	return err
 }

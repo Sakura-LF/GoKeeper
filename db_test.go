@@ -406,8 +406,43 @@ func TestDB_Backup(t *testing.T) {
 	assert.Nil(t, err)
 	assert.NotNil(t, db)
 
-	err = db.Put(util.GetRandomKey(1), util.GetRandomValue(128))
+	for i := 0; i < 5000000; i++ {
+		err = db.Put(util.GetRandomKey(1), util.GetRandomValue(128))
+		assert.Nil(t, err)
+	}
+
+	//backupDir := filepath.Join("./tmp", "gokeeper-backup")
+	//t.Log(backupDir)
+	//err = os.MkdirAll(backupDir, os.ModePerm)
+	//assert.Nil(t, err)
+	//// 测试备份功能
+	//err = db.Backup(backupDir)
+	//assert.Nil(t, err)
+	//
+	//// 使用备份目录启动数据库
+	//opts2 := DefaultOptions
+	//opts2.DirPath = backupDir
+	//db2, err := Open(opts2)
+	////defer destroyDB(db2)
+	//defer db2.Close()
+	//assert.Nil(t, err)
+	//assert.NotNil(t, db2)
+}
+
+func TestDB_Backup2(t *testing.T) {
+	opts := DefaultOptions
+	opts.DirPath = filepath.Join("./tmp", "goKeeper")
+	opts.MMapStartup = true
+	db, err := Open(opts)
+	//defer destroyDB(db)
+	defer db.Close()
 	assert.Nil(t, err)
+	assert.NotNil(t, db)
+
+	//for i := 0; i < 1000000; i++ {
+	//	err = db.Put(util.GetRandomKey(1), util.GetRandomValue(128))
+	//	assert.Nil(t, err)
+	//}
 
 	backupDir := filepath.Join("./tmp", "gokeeper-backup")
 	t.Log(backupDir)
@@ -425,4 +460,23 @@ func TestDB_Backup(t *testing.T) {
 	defer db2.Close()
 	assert.Nil(t, err)
 	assert.NotNil(t, db2)
+}
+
+func TestDB_Backup3(t *testing.T) {
+	opts := DefaultOptions
+	opts.DirPath = filepath.Join("./tmp", "goKeeper")
+	opts.MMapStartup = true
+	db, err := Open(opts)
+	//defer destroyDB(db)
+	defer db.Close()
+	assert.Nil(t, err)
+	assert.NotNil(t, db)
+
+	backupDir := filepath.Join("./tmp", "gokeeper-backup")
+	now := time.Now()
+	err2 := db.Backup(backupDir)
+	assert.Nil(t, err2)
+	fmt.Println(time.Since(now))
+	//err := util.CopyDir2("./tmp/goKeeper", "./tmp/goKeeper-backup", []string{fileLockName})
+	//assert.Nil(t, err)
 }
