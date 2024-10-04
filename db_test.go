@@ -480,3 +480,29 @@ func TestDB_Backup3(t *testing.T) {
 	//err := util.CopyDir2("./tmp/goKeeper", "./tmp/goKeeper-backup", []string{fileLockName})
 	//assert.Nil(t, err)
 }
+
+func TestDB_GetPut(t *testing.T) {
+	opts := DefaultOptions
+	opts.DirPath = filepath.Join("./tmp", "goKeeper1")
+	opts.MMapStartup = true
+	db, err := Open(opts)
+	//defer destroyDB(db)
+	defer db.Close()
+	assert.Nil(t, err)
+	assert.NotNil(t, db)
+
+	//backupDir := filepath.Join("./tmp", "gokeeper-backup")
+	//now := time.Now()
+	//err2 := db.Backup(backupDir)
+	//assert.Nil(t, err2)
+	//fmt.Println(time.Since(now))
+	////err := util.CopyDir2("./tmp/goKeeper", "./tmp/goKeeper-backup", []string{fileLockName})
+	////assert.Nil(t, err)
+
+	err = db.Put([]byte("name"), []byte("Sakura"))
+	assert.Nil(t, err)
+
+	get, err := db.Get([]byte("name"))
+	assert.Nil(t, err)
+	t.Log(string(get))
+}
