@@ -96,9 +96,9 @@ func Open(options Options) (*DB, error) {
 		fileLock:   fileLock,
 	}
 	// 加载 merge 数据目录
-	if err = db.loadMergeFiles(); err != nil {
-		return nil, err
-	}
+	//if err = db.loadMergeFiles(); err != nil {
+	//	return nil, err
+	//}
 
 	// 加载数据文件
 	if err = db.loadDataFile(); err != nil {
@@ -115,13 +115,6 @@ func Open(options Options) (*DB, error) {
 		if err = db.loadIndexFromDataFiles(); err != nil {
 			return nil, err
 		}
-
-		// 重置 IO 类型为标准文件 IO
-		if db.options.MMapStartup {
-			if err := db.resetIoType(); err != nil {
-				return nil, err
-			}
-		}
 	}
 	// 取出当前的事务序列号
 	if options.IndexType == BPlusTree {
@@ -134,6 +127,13 @@ func Open(options Options) (*DB, error) {
 				return nil, err
 			}
 			db.activeFile.WriteOff = size
+		}
+	}
+
+	// 重置 IO 类型为标准文件 IO
+	if db.options.MMapStartup {
+		if err := db.resetIoType(); err != nil {
+			return nil, err
 		}
 	}
 
@@ -524,7 +524,7 @@ func (db *DB) Delete(key []byte) error {
 
 	// 检查key是否存在
 	if pos := db.index.Get(key); pos == nil {
-		return ErrKeyNotFound
+		return nil
 	}
 
 	// 构造 LogRecord, 标识类型是被删除的
